@@ -5,7 +5,7 @@ TechSpecAnalyser accepts source code, files and ZIP projects, performs *determin
 (in later phases) hands that evidence to specialised AI agents whose output is validated and synthesised into
 reports and documentation. **Uploaded code is only parsed, never executed.**
 
-## Status (honest)
+## Status
 | Component | State |
 |---|---|
 | Secure input (paste, file, ZIP) | Implemented, **tested** |
