@@ -1,0 +1,14 @@
+# Runtime
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+python-multipart>=0.0.9      # multipart uploads
+# Static-analysis tools (optional at runtime: the app detects absence and reports it)
+radon>=6.0
+ruff>=0.4
+bandit>=1.7
+# Later phases
+reportlab>=4.0               # PDF reports
+httpx>=0.27                  # GitHub fetching, AI provider calls, API tests
+# Testing (tests also run under plain `python -m unittest`)
+pytest>=8.0

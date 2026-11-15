@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TechSpecAnalyser</title>
+<style>
+:root{--bg:#080B1A;--bg2:#10162B;--v:#8B5CF6;--b:#3B82F6;--l:#C4B5FD;--tx:#F8FAFC;--mut:#94A3B8;--line:rgba(196,181,253,.16);--glass:rgba(16,22,43,.62);--red:#f87171;--amb:#fbbf24;--blu:#60a5fa;--grn:#4ade80;--r:18px;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.6 "Segoe UI",system-ui,-apple-system,sans-serif;min-height:100vh;overflow-x:hidden}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.015em}a{color:inherit;text-decoration:none}button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--l);outline-offset:2px}
+/* space background (fixed, GPU transforms only) */
+#sky{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:radial-gradient(1000px 600px at 70% 10%,rgba(139,92,246,.18),transparent 60%),radial-gradient(800px 600px at 5% 95%,rgba(59,130,246,.14),transparent 60%),var(--bg)}
+.stars{position:absolute;inset:-200px;background-repeat:repeat;will-change:transform}
+.s1{background-image:radial-gradient(1px 1px at 20px 30px,#fff9,transparent),radial-gradient(1px 1px at 120px 80px,#fff7,transparent),radial-gradient(1px 1px at 70px 150px,#c4b5fdaa,transparent);background-size:190px 190px;animation:dr1 160s linear infinite}
+.s2{background-image:radial-gradient(1.5px 1.5px at 40px 60px,#fffc,transparent),radial-gradient(1.5px 1.5px at 160px 140px,#93c5fdaa,transparent);background-size:290px 270px;animation:dr2 220s linear infinite}
+.orb{position:absolute;border-radius:50%;filter:blur(70px);opacity:.35;will-change:transform}
+.o1{width:380px;height:380px;background:var(--v);top:8%;left:-6%;animation:orb1 38s ease-in-out infinite alternate}
+.o2{width:320px;height:320px;background:var(--b);bottom:4%;right:-4%;animation:orb2 46s ease-in-out infinite alternate}
+.pt{position:absolute;width:var(--s);height:var(--s);border-radius:50%;background:var(--l);box-shadow:0 0 8px var(--l);left:var(--x);top:var(--y);opacity:0;animation:pt var(--d) ease-in-out var(--dl) infinite;will-change:transform,opacity}
+@keyframes dr1{to{transform:translate3d(190px,190px,0)}}@keyframes dr2{to{transform:translate3d(-290px,270px,0)}}
+@keyframes orb1{to{transform:translate3d(160px,90px,0) scale(1.15)}}@keyframes orb2{to{transform:translate3d(-140px,-80px,0) scale(1.1)}}
+@keyframes pt{0%{opacity:0;transform:translate3d(0,0,0)}25%{opacity:.8}75%{opacity:.6}100%{opacity:0;transform:translate3d(var(--mx),var(--my),0)}}
+.calm *,.calm *::before,.calm *::after{animation:none!important}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+/* shell */
+#root{position:relative;z-index:1;min-height:100vh}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;display:flex;align-items:center;justify-content:space-between;height:62px;padding:0 22px;background:rgba(8,11,26,.7);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:600;font-size:17px}
+.logo i{width:24px;height:24px;border-radius:50%;background:radial-gradient(circle,#080B1A 38%,transparent 40%),conic-gradient(var(--v),var(--b),var(--l),var(--v));box-shadow:0 0 14px rgba(139,92,246,.6)}
+.tl{display:flex;gap:8px;align-items:center}
+.menu{display:none}
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:12px;padding:12px 22px;font-weight:600;color:#fff;background:linear-gradient(135deg,var(--v),var(--b));box-shadow:0 0 0 1px rgba(255,255,255,.12) inset,0 8px 24px rgba(139,92,246,.4);transition:transform .2s,box-shadow .2s;animation:glow 5s ease-in-out infinite}
+.btn:hover{transform:translateY(-2px);box-shadow:0 0 0 1px rgba(255,255,255,.2) inset,0 10px 34px rgba(139,92,246,.65)}
+.btn.ghost{background:rgba(196,181,253,.08);box-shadow:0 0 0 1px var(--line) inset;animation:none;color:var(--l)}
+.btn.ghost:hover{background:rgba(196,181,253,.16);box-shadow:0 0 0 1px rgba(196,181,253,.4) inset}
+@keyframes glow{50%{box-shadow:0 0 0 1px rgba(255,255,255,.12) inset,0 8px 34px rgba(139,92,246,.62)}}
+.view{animation:in .35s ease both}@keyframes in{from{opacity:0;transform:translateY(8px)}}
+/* landing */
+.hero{display:grid;grid-template-columns:1.05fr 1fr;align-items:center;gap:20px;max-width:1200px;margin:0 auto;padding:40px 28px 70px;min-height:calc(100vh - 62px)}
+.badge{display:inline-block;padding:5px 14px;border-radius:99px;font-size:13px;color:var(--l);background:rgba(139,92,246,.14);border:1px solid var(--line);margin-bottom:20px}
+.hero h1{font-size:clamp(40px,6vw,68px);line-height:1.02}
+.hero h2{font-size:clamp(20px,2.4vw,27px);color:var(--l);font-weight:500;margin:14px 0 16px;max-width:520px}
+.hero p{color:var(--mut);max-width:500px;margin:0 0 28px;font-size:16px}
+.cta{display:flex;gap:12px;flex-wrap:wrap}
+.pw{position:relative;aspect-ratio:1;width:min(100%,520px);justify-self:center;animation:float 11s ease-in-out infinite}
+@keyframes float{50%{transform:translate3d(0,-14px,0)}}
+.rays{position:absolute;inset:-12%;border-radius:50%;background:repeating-conic-gradient(from 0deg,rgba(196,181,253,.22) 0 2deg,transparent 2deg 14deg);-webkit-mask:radial-gradient(circle,transparent 30%,#000 42%,transparent 70%);mask:radial-gradient(circle,transparent 30%,#000 42%,transparent 70%);filter:blur(3px);animation:spin 140s linear infinite}
+.ring{position:absolute;border-radius:50%;will-change:transform}
+.r1{inset:8%;background:conic-gradient(from 0deg,var(--v),var(--b),var(--l),var(--v));-webkit-mask:radial-gradient(circle,transparent 61%,#000 63%,#000 70%,transparent 72%);mask:radial-gradient(circle,transparent 61%,#000 63%,#000 70%,transparent 72%);filter:drop-shadow(0 0 16px rgba(139,92,246,.8));animation:spin 28s linear infinite}
+.r2{inset:15%;background:conic-gradient(from 90deg,transparent,var(--b),transparent 45%,var(--v),transparent);-webkit-mask:radial-gradient(circle,transparent 66%,#000 68%,#000 71%,transparent 73%);mask:radial-gradient(circle,transparent 66%,#000 68%,#000 71%,transparent 73%);animation:spin 40s linear infinite reverse}
+.core{position:absolute;inset:20%;border-radius:50%;background:radial-gradient(circle at 50% 50%,#04050f 0 38%,#1a1245 62%,rgba(139,92,246,.55) 82%,transparent 100%);box-shadow:0 0 90px 10px rgba(139,92,246,.4),inset 0 0 60px rgba(59,130,246,.5);animation:pulse 7s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 120px 20px rgba(139,92,246,.55),inset 0 0 70px rgba(59,130,246,.6)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.orbit{position:absolute;inset:var(--i);animation:spin var(--t) linear infinite;will-change:transform}
+.orbit b{position:absolute;top:0;left:50%;width:6px;height:6px;margin-left:-3px;border-radius:50%;background:var(--l);box-shadow:0 0 10px var(--l)}
+.feat{max-width:1200px;margin:-30px auto 0;padding:0 28px 80px}
+/* app */
+.wrap{display:flex}
+nav{width:250px;flex:none;padding:18px 12px;border-right:1px solid var(--line);position:sticky;top:calc(62px + env(safe-area-inset-top,0px));height:calc(100vh - 62px);overflow:auto;background:rgba(8,11,26,.45);backdrop-filter:blur(10px)}
+nav a{display:flex;align-items:center;gap:12px;padding:11px 14px;margin-bottom:3px;border-radius:12px;color:var(--mut);transition:background .2s,color .2s,transform .2s}
+nav a:hover{background:rgba(196,181,253,.08);color:#fff;transform:translateX(3px)}
+nav a.on{color:#fff;background:linear-gradient(90deg,rgba(139,92,246,.32),rgba(59,130,246,.08));box-shadow:inset 0 0 0 1px var(--line),inset 2px 0 var(--l)}
+svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+main{flex:1;min-width:0;padding:30px;max-width:1180px}
+.card{background:var(--glass);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:var(--r);padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.3);transition:transform .25s,border-color .25s,box-shadow .25s}
+a.card:hover,.lift:hover{transform:translateY(-4px);border-color:rgba(196,181,253,.4);box-shadow:0 16px 40px rgba(0,0,0,.4),0 0 30px rgba(139,92,246,.18)}
+.grid{display:grid;gap:16px}.g4{grid-template-columns:repeat(4,1fr)}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
+.mt{margin-top:18px}.mut{color:var(--mut)}
+.ph{margin-bottom:22px}.ph h1{font-size:clamp(24px,3.2vw,32px)}.ph p{margin:6px 0 0;color:var(--mut)}
+.ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;color:var(--l);background:linear-gradient(135deg,rgba(139,92,246,.3),rgba(59,130,246,.18));border:1px solid var(--line);margin-bottom:14px}
+.card h3{margin-bottom:6px;font-size:17px}.card p{margin:0;color:var(--mut);font-size:14px}
+textarea,input[type=text],select{width:100%;background:rgba(8,11,26,.8);border:1px solid var(--line);color:var(--tx);border-radius:12px;padding:12px 14px;font:inherit}
+textarea{font:13.5px/1.65 ui-monospace,Consolas,monospace;min-height:260px;resize:vertical}
+textarea:focus,input:focus,select:focus{border-color:var(--v);box-shadow:0 0 0 3px rgba(139,92,246,.2);outline:0}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.sp{justify-content:space-between}
+.drop{border:1.5px dashed rgba(196,181,253,.35);border-radius:var(--r);padding:34px 20px;text-align:center;color:var(--mut);transition:background .2s,border-color .2s}
+.drop.over{background:rgba(139,92,246,.14);border-color:var(--l)}
+.sev{display:flex;gap:8px;flex-wrap:wrap}.chip{padding:3px 12px;border-radius:99px;font-size:12.5px;border:1px solid}
+.c-r{color:var(--red);border-color:#f8717155;background:#f8717112}.c-a{color:var(--amb);border-color:#fbbf2455;background:#fbbf2412}.c-b{color:var(--blu);border-color:#60a5fa55;background:#60a5fa12}.c-g{color:var(--grn);border-color:#4ade8055;background:#4ade8012}
+details{border:1px solid var(--line);border-radius:14px;background:var(--glass);margin-bottom:10px;overflow:hidden}
+summary{padding:14px 18px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;font-weight:500}
+summary::after{content:"+";color:var(--l);font-size:20px;transition:transform .2s}details[open] summary::after{transform:rotate(45deg)}
+details div{padding:0 18px 16px;color:var(--mut);font-size:14px}
+.prog{height:6px;border-radius:9px;background:rgba(196,181,253,.12);overflow:hidden;margin-top:14px;display:none}.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--v),var(--b),var(--l));transition:width .3s}
+.spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite;display:none}
+.busy .spin{display:inline-block}
+#toasts{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;flex-direction:column;gap:10px}
+.toast{padding:12px 18px;border-radius:14px;background:rgba(16,22,43,.95);border:1px solid rgba(196,181,253,.35);box-shadow:0 10px 34px rgba(0,0,0,.5),0 0 20px rgba(139,92,246,.25);animation:in .3s ease both;max-width:340px;font-size:14px}
+.sw{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--line)}.sw input{width:40px;height:22px;accent-color:var(--v)}
+.empty{padding:26px;text-align:center;color:var(--mut);border:1px dashed var(--line);border-radius:14px;font-size:14px}
+.note{font-size:12px;color:var(--mut);margin-top:28px}
+@media(max-width:1000px){.g4{grid-template-columns:1fr 1fr}.g2,.g3{grid-template-columns:1fr}.hero{grid-template-columns:1fr;text-align:left;padding-top:20px}.pw{width:min(80%,400px);order:-1}}
+@media(max-width:760px){.menu{display:inline-flex}nav{position:fixed;z-index:40;left:0;top:calc(62px + env(safe-area-inset-top,0px));width:270px;background:#0b1024;transform:translateX(-102%);transition:transform .25s}nav.open{transform:none}main{padding:20px 14px}.g4{grid-template-columns:1fr}.top .hide{display:none}}
+</style>
+</head>
+<body>
+<div id="sky"><div class="stars s1"></div><div class="stars s2"></div><div class="orb o1"></div><div class="orb o2"></div><div id="pts"></div></div>
+<div id="root">
+ <header class="top">
+  <div class="row" style="gap:10px"><button class="btn ghost menu" id="mb" style="padding:7px 12px" aria-label="Menu">Menu</button><a class="logo" href="#home"><i></i>TechSpecAnalyser</a></div>
+  <div class="tl"><a class="btn ghost hide" href="#dashboard" style="padding:8px 16px">Dashboard</a></div>
+ </header>
+ <div id="body"></div>
+</div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+const IC={dash:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',code:'<path d="M8 8l-5 4 5 4M16 8l5 4-5 4M14 5l-4 14"/>',git:'<circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="9" r="2"/><path d="M6 8v8M18 11c0 4-6 3-12 5"/>',pdf:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h4"/>',hist:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',rep:'<path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>',doc:'<path d="M4 5h16M4 10h10M4 15h16M4 20h8"/>'};
+const ic=k=>`<svg class="i" viewBox="0 0 24 24">${IC[k]}</svg>`;
+const NAV=[['dashboard','Dashboard','dash'],['code-analysis','Code Analysis','code'],['github-review','GitHub Repository Review','git'],['pdf-analysis','PDF Analysis','pdf'],['history','Analysis History','hist'],['reports','Generated Reports','rep'],['app-settings','Settings','gear']];
+const $=s=>document.querySelector(s);
+function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),4200)}
+const head=(t,s)=>`<div class="ph"><h1>${t}</h1><p>${s}</p></div>`;
+const empty=t=>`<div class="empty">${t}</div>`;
+const legend=`<div class="sev"><span class="chip c-r">Critical</span><span class="chip c-a">Warning</span><span class="chip c-b">Informational</span><span class="chip c-g">Passed</span></div>`;
+const SECT=['Syntax Errors','Code Quality','Complexity Analysis','Security Issues','AI Code Review','Suggestions for Improvement'];
+const results=(secs,msg)=>`<div class="mt"><div class="row sp" style="margin-bottom:12px"><h3>Results</h3>${legend}</div>${secs.map(s=>`<details><summary>${s}</summary><div>${msg}</div></details>`).join('')}</div>`;
+const NOENG='Nothing to show yet. Results from your analysis engine appear here once an analysis has run.';
+function runDemo(btn,bar,label){if(btn.classList.contains('busy'))return;btn.classList.add('busy');const p=$(bar);p.style.display='block';const f=p.firstElementChild;f.style.width='0';let n=0;const iv=setInterval(()=>{n+=8+Math.random()*10;f.style.width=Math.min(n,100)+'%';if(n>=100){clearInterval(iv);btn.classList.remove('busy');setTimeout(()=>p.style.display='none',500);toast(label+': this prototype has no analysis engine connected, so no results were generated.')}},260)}
+const feats=[['code-analysis','Code Analysis','code','Upload or paste source code to perform intelligent code analysis.'],['github-review','GitHub Repository Review','git','Connect a repository and analyze its code structure and quality.'],['pdf-analysis','PDF Analysis','pdf','Upload technical specification PDFs for analysis.'],['reports','Documentation Generator','doc','Generate structured technical documentation.']];
+const cards=()=>feats.map(f=>`<a class="card" href="#${f[0]}"><div class="ic">${ic(f[2])}</div><h3>${f[1]}</h3><p>${f[3]}</p></a>`).join('');
+const V={
+home:()=>`<section class="hero"><div><span class="badge">AI-Powered Developer Intelligence</span><h1>TechSpecAnalyser</h1><h2>Enter the Universe of Intelligent Code Analysis</h2><p>An AI-powered code intelligence platform that analyzes source code, detects potential issues, reviews GitHub repositories, and generates meaningful technical documentation.</p><div class="cta"><a class="btn" href="#code-analysis">Launch Code Analysis</a><a class="btn ghost" href="#features">Explore Features</a></div></div>
+<div class="pw" aria-hidden="true"><div class="rays"></div><div class="ring r1"></div><div class="ring r2"></div><div class="core"></div><div class="orbit" style="--i:4%;--t:22s"><b></b></div><div class="orbit" style="--i:12%;--t:34s;animation-direction:reverse"><b style="background:#93c5fd;box-shadow:0 0 10px #60a5fa"></b></div><div class="orbit" style="--i:0%;--t:50s"><b style="width:4px;height:4px"></b></div></div></section>
+<section class="feat" id="features"><div class="grid g4">${cards()}</div></section>`,
+dashboard:()=>head('Welcome to Your Code Universe','Explore, analyze, and improve your code with intelligent AI-powered tools.')+`<div class="grid g4">${cards()}</div><div class="card mt"><div class="row sp"><div><h3>Recent activity</h3><p>Your latest analyses will appear here.</p></div><a class="btn" href="#code-analysis">Start an analysis</a></div></div>`,
+'code-analysis':()=>head('Code Analysis','Paste or upload source code to review it.')+`<div class="card"><div class="row" style="margin-bottom:14px"><select id="lang" style="width:auto;min-width:170px" aria-label="Language">${['Python','JavaScript','TypeScript','Java','C','C++','C#','Go','Rust','PHP'].map(l=>`<option>${l}</option>`).join('')}</select><label class="btn ghost" style="padding:10px 18px;animation:none">Upload file<input id="cf" type="file" hidden accept=".py,.js,.ts,.java,.c,.cpp,.cs,.go,.rs,.php,.txt"></label></div><textarea id="code" placeholder="Paste your code here…" spellcheck="false" aria-label="Source code"></textarea><div class="row mt"><button class="btn" id="an"><span class="spin"></span>Analyze Code</button><span class="mut" id="fn"></span></div><div class="prog" id="pg"><i></i></div></div>`+results(SECT,NOENG),
+'github-review':()=>head('GitHub Repository Review','Analyze a repository’s structure and quality.')+`<div class="card"><div class="row"><input type="text" id="url" placeholder="https://github.com/owner/repository" style="flex:1;min-width:240px" aria-label="Repository URL"><button class="btn" id="an"><span class="spin"></span>Analyze Repository</button></div><div class="prog" id="pg"><i></i></div><div id="ri" class="mt"></div></div>`+results(['Repository Information','File Structure','Static Analysis Results','AI-Generated Review','Improvement Suggestions'],NOENG),
+'pdf-analysis':()=>head('PDF Analysis','Upload a technical specification to extract and review it.')+`<div class="card"><label class="drop" id="dz" style="display:block;cursor:pointer"><div class="ic" style="margin:0 auto 12px">${ic('pdf')}</div><b style="color:var(--tx)">Drag and drop a PDF here</b><br>or click to choose a file<input id="pf" type="file" accept="application/pdf" hidden></label><div id="pi" class="mt"></div><div class="row mt"><button class="btn" id="an"><span class="spin"></span>Analyze PDF</button></div><div class="prog" id="pg"><i></i></div></div>`+results(['Extracted Technical Specifications','AI-Generated Insights','Downloadable Reports'],NOENG),
+history:()=>head('Analysis History','Everything you have analyzed, newest first.')+`<div class="card">${empty('No analyses yet. Run one and it will be listed here.')}</div>`,
+reports:()=>head('Generated Reports','Quality scores, findings and documentation.')+`<div class="grid g3"><div class="card"><h3>Overall quality score</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">Not calculated</p><p>Shown only after an analysis computes one.</p></div><div class="card"><h3>Issues detected</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">–</p></div><div class="card"><h3>Security findings</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">–</p></div></div><div class="card mt"><h3 style="margin-bottom:12px">Reports</h3>${empty('No reports generated yet.')}</div>`,
+'app-settings':()=>head('Settings','Preferences for this workspace.')+`<div class="card" style="max-width:640px"><div class="sw"><span>Calm mode<br><small class="mut">Turns off background drift and glow animations</small></span><input type="checkbox" id="calm" ${document.body.classList.contains('calm')?'checked':''}></div><p class="mut mt">API keys and connections are managed by your backend and are never stored in this page.</p></div>`};
+function bind(k){const an=$('#an');
+ if(k=='code-analysis'){$('#cf').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('#code').value=r.result;$('#fn').textContent=f.name;toast('Loaded '+f.name)};r.readAsText(f)};an.onclick=()=>{if(!$('#code').value.trim())return toast('Add some code first.');runDemo(an,'#pg','Code Analysis')}}
+ if(k=='github-review'){an.onclick=()=>{const m=$('#url').value.trim().match(/^https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/);if(!m)return toast('Enter a URL like https://github.com/owner/repository');$('#ri').innerHTML=`<span class="chip c-b">${m[1]}/${m[2]}</span>`;runDemo(an,'#pg','Repository Review')}}
+ if(k=='pdf-analysis'){const dz=$('#dz'),pf=$('#pf');const show=f=>{if(!f||f.type!='application/pdf')return toast('Please choose a PDF file.');$('#pi').innerHTML=`<span class="chip c-b">${f.name.replace(/[<>&]/g,'')} · ${(f.size/1024).toFixed(0)} KB</span>`;toast('Document ready')};pf.onchange=e=>show(e.target.files[0]);['dragenter','dragover'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.add('over')}));['dragleave','drop'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.remove('over')}));dz.addEventListener('drop',e=>show(e.dataTransfer.files[0]));an.onclick=()=>{if(!$('#pi').innerHTML)return toast('Upload a PDF first.');runDemo(an,'#pg','PDF Analysis')}}
+ if(k=='app-settings')$('#calm').onchange=e=>{document.body.classList.toggle('calm',e.target.checked);toast(e.target.checked?'Calm mode on':'Calm mode off')}}
+function render(){const h=location.hash.slice(1);const k=V[h]?h:(h=='features'?'home':'home');const home=k=='home';
+ $('#body').innerHTML=home?`<div class="view">${V.home()}</div>`:`<div class="wrap"><nav id="nav">${NAV.map(n=>`<a href="#${n[0]}" class="${n[0]==k?'on':''}">${ic(n[2])}${n[1]}</a>`).join('')}</nav><main><div class="view">${V[k]()}<p class="note">Prototype: no analysis engine is connected, so no results are generated or invented.</p></div></main></div>`;
+ $('#mb').style.display=home?'none':'';bind(k);if(h=='features')document.getElementById('features').scrollIntoView({behavior:'smooth'});else scrollTo(0,0)}
+addEventListener('hashchange',render);
+$('#mb').onclick=()=>{const n=$('#nav');n&&n.classList.toggle('open')};
+document.addEventListener('click',e=>{const n=$('#nav');if(n&&n.classList.contains('open')&&!e.target.closest('nav')&&e.target.id!='mb')n.classList.remove('open')});
+const P=$('#pts');for(let i=0;i<22;i++){const s=document.createElement('span');s.className='pt';s.style.cssText=`--s:${1.5+Math.random()*2.5}px;--x:${Math.random()*100}%;--y:${Math.random()*100}%;--d:${14+Math.random()*20}s;--dl:-${Math.random()*20}s;--mx:${(Math.random()-.5)*200}px;--my:${(Math.random()-.5)*200}px`;P.appendChild(s)}
+render();
+</script>
+</body>
+</html>
