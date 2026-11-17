@@ -149,7 +149,15 @@ history:()=>head('Analysis History','Everything you have analyzed, newest first.
 reports:()=>head('Generated Reports','Quality scores, findings and documentation.')+`<div class="grid g3"><div class="card"><h3>Overall quality score</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">Not calculated</p><p>Shown only after an analysis computes one.</p></div><div class="card"><h3>Issues detected</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">–</p></div><div class="card"><h3>Security findings</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">–</p></div></div><div class="card mt"><h3 style="margin-bottom:12px">Reports</h3>${empty('No reports generated yet.')}</div>`,
 'app-settings':()=>head('Settings','Preferences for this workspace.')+`<div class="card" style="max-width:640px"><div class="sw"><span>Calm mode<br><small class="mut">Turns off background drift and glow animations</small></span><input type="checkbox" id="calm" ${document.body.classList.contains('calm')?'checked':''}></div><p class="mut mt">API keys and connections are managed by your backend and are never stored in this page.</p></div>`};
 function renderAnalysisOutput(data){
-  const el=$('#res-box');if(!el)return;
+  let el=$('#res-box');
+  if(!el){
+    el=document.createElement('div');
+    el.id='res-box';
+    el.className='mt';
+    const mainCard=$('.card');
+    if(mainCard) mainCard.after(el);
+    else document.body.appendChild(el);
+  }
   const m=data.metrics||{};
   const tools=(data.tools||[]).filter(t=>t.ran).map(t=>t.name+(t.version?' ('+t.version+')':'')).join(', ') || 'Built-in AST';
   const findings=data.findings||[];
@@ -220,6 +228,7 @@ function renderAnalysisOutput(data){
     <details open><summary>Code Quality & Warnings (${warn.length})</summary><div>${renderList(warn)}</div></details>
     <details><summary>Complexity & Informational (${info.length})</summary><div>${renderList(info)}</div></details>
   `;
+  setTimeout(()=>el.scrollIntoView({behavior:'smooth'}),100);
 }
 
 function bind(k){
