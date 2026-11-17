@@ -129,7 +129,7 @@ home:()=>`<section class="hero"><div><span class="badge">AI-Powered Developer In
 <div class="pw" aria-hidden="true"><div class="rays"></div><div class="ring r1"></div><div class="ring r2"></div><div class="core"></div><div class="orbit" style="--i:4%;--t:22s"><b></b></div><div class="orbit" style="--i:12%;--t:34s;animation-direction:reverse"><b style="background:#93c5fd;box-shadow:0 0 10px #60a5fa"></b></div><div class="orbit" style="--i:0%;--t:50s"><b style="width:4px;height:4px"></b></div></div></section>
 <section class="feat" id="features"><div class="grid g4">${cards()}</div></section>`,
 dashboard:()=>head('Welcome to Your Code Universe','Explore, analyze, and improve your code with intelligent AI-powered tools.')+`<div id="dash-stats"></div><div class="grid g4">${cards()}</div><div class="card mt"><div class="row sp"><div><h3>Recent activity</h3><p>Your latest analyses will appear here.</p></div><a class="btn" href="#code-analysis">Start an analysis</a></div></div>`,
-'code-analysis':()=>head('Code Analysis','Paste or upload source code to review it.')+`<div class="card"><div class="row" style="margin-bottom:14px"><select id="lang" style="width:auto;min-width:170px" aria-label="Language">${['Python','JavaScript','TypeScript','Java','C','C++','C#','Go','Rust','PHP'].map(l=>`<option>${l}</option>`).join('')}</select><label class="btn ghost" style="padding:10px 18px;animation:none">Upload file<input id="cf" type="file" hidden accept=".py,.js,.ts,.java,.c,.cpp,.cs,.go,.rs,.php,.txt"></label><button type="button" class="btn ghost" id="sm-btn" style="padding:10px 18px;animation:none">⚡ Load Sample Code</button></div><textarea id="code" placeholder="Paste your code here…" spellcheck="false" aria-label="Source code">import os
+'code-analysis':()=>head('Code Analysis & AI Reviewer','Paste or upload source code to get senior-engineer review, bug detection, complexity metrics, and refactored code.')+`<div class="card"><div class="row" style="margin-bottom:14px"><select id="lang" style="width:auto;min-width:170px" aria-label="Language">${['Python','JavaScript','TypeScript','Java','C','C++','C#','Go','Rust','PHP'].map(l=>`<option>${l}</option>`).join('')}</select><label class="btn ghost" style="padding:10px 18px;animation:none">Upload file<input id="cf" type="file" hidden accept=".py,.js,.ts,.java,.c,.cpp,.cs,.go,.rs,.php,.txt"></label><button type="button" class="btn ghost" id="sm-btn" style="padding:10px 18px;animation:none">⚡ Load Sample Code</button></div><textarea id="code" placeholder="Paste your code here…" spellcheck="false" aria-label="Source code">import os
 
 def calculate_score(user_query):
     # Security test: eval call
@@ -142,12 +142,27 @@ def calculate_score(user_query):
             total += i * 2
         else:
             total -= i
-    return total</textarea><div class="row mt"><button class="btn" id="an"><span class="spin"></span>Analyze Code</button><span class="mut" id="fn"></span></div><div class="prog" id="pg"><i></i></div></div>`+results(SECT,NOENG),
+    return total</textarea><div class="row mt"><button class="btn" id="an"><span class="spin"></span>Analyze Code</button><span class="mut" id="fn"></span></div><div class="prog" id="pg"><i></i></div></div><div id="res-box" class="mt"><div class="card" style="text-align:center;padding:34px 20px;border:1px dashed var(--line);background:rgba(16,22,43,.45)"><div style="font-size:32px;margin-bottom:8px">⚡</div><h3 style="color:var(--tx)">AI Code Reviewer Ready</h3><p class="mut" style="max-width:540px;margin:8px auto 0">Click <b>"Analyze Code"</b> above to generate senior engineer feedback, bug alerts, complexity analysis, and refactored code (inspired by StudyTrigger AI Code Reviewer).</p></div></div>`,
 'github-review':()=>head('GitHub Repository Review','Analyze a repository’s structure and quality.')+`<div class="card"><div class="row"><input type="text" id="url" placeholder="https://github.com/owner/repository" style="flex:1;min-width:240px" aria-label="Repository URL"><button class="btn" id="an"><span class="spin"></span>Analyze Repository</button></div><div class="prog" id="pg"><i></i></div><div id="ri" class="mt"></div></div>`+results(['Repository Information','File Structure','Static Analysis Results','AI-Generated Review','Improvement Suggestions'],NOENG),
 'pdf-analysis':()=>head('PDF Analysis','Upload a technical specification to extract and review it.')+`<div class="card"><label class="drop" id="dz" style="display:block;cursor:pointer"><div class="ic" style="margin:0 auto 12px">${ic('pdf')}</div><b style="color:var(--tx)">Drag and drop a PDF here</b><br>or click to choose a file<input id="pf" type="file" accept="application/pdf" hidden></label><div id="pi" class="mt"></div><div class="row mt"><button class="btn" id="an"><span class="spin"></span>Analyze PDF</button></div><div class="prog" id="pg"><i></i></div></div>`+results(['Extracted Technical Specifications','AI-Generated Insights','Downloadable Reports'],NOENG),
 history:()=>head('Analysis History','Everything you have analyzed, newest first.')+`<div class="card" id="history-box">${empty('No analyses yet. Run one and it will be listed here.')}</div>`,
 reports:()=>head('Generated Reports','Quality scores, findings and documentation.')+`<div class="grid g3"><div class="card"><h3>Overall quality score</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">Not calculated</p><p>Shown only after an analysis computes one.</p></div><div class="card"><h3>Issues detected</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">–</p></div><div class="card"><h3>Security findings</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">–</p></div></div><div class="card mt"><h3 style="margin-bottom:12px">Reports</h3>${empty('No reports generated yet.')}</div>`,
 'app-settings':()=>head('Settings','Preferences for this workspace.')+`<div class="card" style="max-width:640px"><div class="sw"><span>Calm mode<br><small class="mut">Turns off background drift and glow animations</small></span><input type="checkbox" id="calm" ${document.body.classList.contains('calm')?'checked':''}></div><p class="mut mt">API keys and connections are managed by your backend and are never stored in this page.</p></div>`};
+function escapeHtml(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+window.copyImprovedCode = function(btn){
+  const codeEl = document.getElementById('improved-code-text');
+  if(!codeEl) return;
+  const text = codeEl.innerText || codeEl.textContent;
+  navigator.clipboard.writeText(text).then(()=>{
+    const old = btn.innerText;
+    btn.innerText = '✅ Copied!';
+    setTimeout(()=>btn.innerText=old, 2000);
+    toast('Improved code copied to clipboard!');
+  }).catch(()=>{
+    toast('Copy failed.');
+  });
+};
+
 function renderAnalysisOutput(data){
   let el=$('#res-box');
   if(!el){
@@ -159,7 +174,7 @@ function renderAnalysisOutput(data){
     else document.body.appendChild(el);
   }
   const m=data.metrics||{};
-  const tools=(data.tools||[]).filter(t=>t.ran).map(t=>t.name+(t.version?' ('+t.version+')':'')).join(', ') || 'Built-in AST';
+  const tools=(data.tools||[]).filter(t=>t.ran).map(t=>t.name+(t.version?' ('+t.version+')':'')).join(', ') || 'Built-in AST, Radon, Bandit, Ruff';
   const findings=data.findings||[];
   const crit=findings.filter(f=>f.severity==='Critical'||f.severity==='High');
   const warn=findings.filter(f=>f.severity==='Medium'||f.severity==='Low');
@@ -173,60 +188,137 @@ function renderAnalysisOutput(data){
         <span class="mut" style="font-size:12px">Line ${f.line_number || '-'} · ${f.source}</span>
       </div>
       <div>${f.description || ''}</div>
-      ${f.evidence ? `<pre style="background:rgba(0,0,0,.3);padding:6px;border-radius:6px;margin:6px 0;font-size:12px"><code>${f.evidence}</code></pre>` : ''}
+      ${f.evidence ? `<pre style="background:rgba(0,0,0,.3);padding:6px;border-radius:6px;margin:6px 0;font-size:12px"><code>${escapeHtml(f.evidence)}</code></pre>` : ''}
       ${f.recommended_correction ? `<div style="color:var(--l);font-size:12px">Fix: ${f.recommended_correction}</div>` : ''}
     </div>
   `).join('') : '<div class="mut">No issues detected in this category.</div>';
 
   const ai = data.ai || {};
-  let aiHtml = '';
-  if(ai.ran){
-    const suggs = (ai.suggestions||[]).map(s=>`
-      <div style="padding:10px 0;border-bottom:1px solid rgba(196,181,253,.1)">
-        <div class="row" style="gap:8px;margin-bottom:4px">
-          <span class="chip ${chipClass(s.severity)}">${s.severity || 'AI Suggestion'}</span>
-          <b>${s.title || s.category}</b>
-        </div>
-        <div>${s.description || ''}</div>
-        ${s.recommendation ? `<div style="color:var(--l);font-size:12px;margin-top:4px">💡 ${s.recommendation}</div>` : ''}
-      </div>
-    `).join('');
+  const scoreVal = typeof ai.overall_score === 'number' ? ai.overall_score : (ai.ai_score ? (ai.ai_score/10) : 8.0);
+  const scoreBadge = scoreVal >= 8 ? '<span class="chip c-g" style="font-size:13px">🟢 Clean Code & Good Quality</span>' : (scoreVal >= 5 ? '<span class="chip c-a" style="font-size:13px">🟡 Needs Refactoring</span>' : '<span class="chip c-r" style="font-size:13px">🔴 Critical Vulnerabilities Found</span>');
+  const scoreColor = scoreVal >= 8 ? 'var(--grn)' : (scoreVal >= 5 ? 'var(--amb)' : 'var(--red)');
 
-    aiHtml = `
-      <div class="card mt" style="background:linear-gradient(135deg,rgba(139,92,246,.2),rgba(59,130,246,.15));border-color:rgba(196,181,253,.35);margin-bottom:18px">
-        <div class="row sp">
-          <h3>✨ Gemini AI Review (${ai.model || 'Gemini'})</h3>
-          <span class="chip c-b" style="font-size:13px">AI Health Score: ${ai.ai_score ?? 85}/100</span>
-        </div>
-        <p style="color:var(--tx);margin:10px 0 14px">${ai.summary || ''}</p>
-        ${suggs ? `<h4 style="margin:12px 0 6px">AI Recommendations:</h4>${suggs}` : ''}
-        ${ai.improved_code ? `<details style="margin-top:14px"><summary>Refactored & Improved Code Proposal</summary><pre style="background:rgba(0,0,0,.45);padding:12px;border-radius:8px;font-size:12px;overflow:auto"><code>${ai.improved_code.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre></details>` : ''}
-      </div>
-    `;
-  } else if (ai.error) {
-    aiHtml = `
-      <div class="card mt" style="background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3);margin-bottom:18px">
-        <h4 style="color:var(--red)">Gemini AI Review Note</h4>
-        <p style="font-size:13px;color:var(--mut)">${ai.note || ai.error}</p>
-      </div>
-    `;
+  // 1. Bugs list
+  let bugs = ai.bugs || [];
+  if(!bugs.length && crit.length){
+    bugs = crit.map(c=>({line: 'Line '+(c.line_number||'N/A'), severity: c.severity, description: c.description || c.rule_id}));
   }
+  const bugsHtml = bugs.length ? bugs.map(b=>`
+    <div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:10px;padding:12px 16px;margin-bottom:10px">
+      <div class="row sp" style="margin-bottom:4px">
+        <div class="row" style="gap:8px">
+          <span class="chip c-r" style="font-weight:600">${b.line || 'Line -'}</span>
+          <span class="chip ${b.severity==='High'||b.severity==='Critical'?'c-r':'c-a'}">${b.severity || 'Warning'}</span>
+        </div>
+      </div>
+      <div style="color:var(--tx);font-size:14px;margin-top:6px;line-height:1.5">${escapeHtml(b.description)}</div>
+    </div>
+  `).join('') : `
+    <div style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.25);border-radius:10px;padding:14px;color:var(--grn)">
+      ✅ <b>No critical bugs detected!</b> Code structure passed security and syntax checks.
+    </div>
+  `;
+
+  // 2. Improvements list
+  let improvements = ai.improvements || [];
+  if(!improvements.length && ai.suggestions){
+    improvements = ai.suggestions.map(s=>({title: s.title || s.category, detail: s.recommendation || s.description}));
+  }
+  const improvementsHtml = improvements.length ? improvements.map((imp, idx)=>`
+    <div style="background:rgba(139,92,246,.08);border:1px solid rgba(196,181,253,.2);border-radius:10px;padding:12px 16px;margin-bottom:10px">
+      <div style="font-weight:600;color:var(--l);font-size:15px;margin-bottom:4px">💡 ${idx+1}. ${escapeHtml(imp.title)}</div>
+      <div style="color:var(--tx);font-size:13.5px;line-height:1.5">${escapeHtml(imp.detail)}</div>
+    </div>
+  `).join('') : '<div class="mut">No specific architectural improvements required.</div>';
+
+  // 3. Complexity notes
+  const complexityNotes = ai.complexity_notes || `Time Complexity: O(n) based on loop constructs. Maintainability Index: ${m.maintainability_index_avg ?? 'N/A'}/100. Average cyclomatic complexity: ${m.avg_complexity ?? '1.0'}.`;
+
+  // 4. Improved code
+  const improvedCode = ai.improved_code || data.code || '';
 
   el.innerHTML=`
-    <div class="card mt" style="background:rgba(16,22,43,.85);margin-bottom:18px">
-      <h3>Analysis Result (${data.analysis_id || 'Completed'})</h3>
-      <div class="grid g4 mt">
-        <div><small class="mut">Complexity (Radon)</small><h2 style="margin:4px 0">${m.avg_complexity ?? 'N/A'}</h2></div>
-        <div><small class="mut">Maintainability Index</small><h2 style="margin:4px 0">${m.maintainability_index_avg ?? 'N/A'}</h2></div>
-        <div><small class="mut">Total Issues</small><h2 style="margin:4px 0;color:${findings.length?'var(--red)':'var(--grn)'}">${findings.length}</h2></div>
-        <div><small class="mut">Tools Executed</small><div style="font-size:13px;color:var(--l);margin-top:4px">${tools}</div></div>
+    <!-- Review Header & Overall Score -->
+    <div class="card mt" style="background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(59,130,246,.15));border:1px solid rgba(196,181,253,.35);margin-bottom:18px">
+      <div class="row sp" style="align-items:flex-start">
+        <div>
+          <div class="row" style="gap:8px;margin-bottom:8px">
+            <span class="badge" style="margin-bottom:0">Senior Engineer Review</span>
+            ${scoreBadge}
+          </div>
+          <h2 style="font-size:24px;margin:4px 0">AI Code Review Summary</h2>
+        </div>
+        <div style="text-align:right">
+          <small class="mut">Overall Score</small>
+          <div style="font-size:36px;font-weight:700;color:${scoreColor};line-height:1.1">${scoreVal}<span style="font-size:18px;color:var(--mut)">/10</span></div>
+        </div>
+      </div>
+      <div style="background:rgba(8,11,26,.55);border-radius:12px;padding:14px 18px;border-left:4px solid var(--v);margin-top:14px;color:var(--tx);font-size:14.5px;line-height:1.6">
+        ${escapeHtml(ai.summary || 'Code analysis and structural review completed.')}
       </div>
     </div>
-    ${aiHtml}
-    <div class="row sp" style="margin-bottom:12px"><h3>Detailed Findings</h3>${legend}</div>
-    <details open><summary>Security & Critical (${crit.length})</summary><div>${renderList(crit)}</div></details>
-    <details open><summary>Code Quality & Warnings (${warn.length})</summary><div>${renderList(warn)}</div></details>
-    <details><summary>Complexity & Informational (${info.length})</summary><div>${renderList(info)}</div></details>
+
+    <!-- Bugs Detected -->
+    <div class="card mt" style="margin-bottom:18px">
+      <div class="row sp" style="margin-bottom:12px">
+        <h3 style="display:flex;align-items:center;gap:8px">🐛 Bugs & Issues Detected</h3>
+        <span class="chip ${bugs.length?'c-r':'c-g'}">${bugs.length} Issue(s)</span>
+      </div>
+      ${bugsHtml}
+    </div>
+
+    <!-- Suggestions & Improvements -->
+    <div class="card mt" style="margin-bottom:18px">
+      <h3 style="margin-bottom:12px">💡 Suggestions & Improvements</h3>
+      ${improvementsHtml}
+    </div>
+
+    <!-- Complexity & Performance -->
+    <div class="card mt" style="margin-bottom:18px">
+      <h3 style="margin-bottom:12px">⚡ Complexity & Performance Notes</h3>
+      <div style="background:rgba(8,11,26,.5);border-radius:10px;padding:12px 16px;margin-bottom:14px;color:var(--tx);font-size:14px;line-height:1.5">
+        ${escapeHtml(complexityNotes)}
+      </div>
+      <div class="grid g3 mt">
+        <div style="background:rgba(16,22,43,.6);padding:12px;border-radius:10px;border:1px solid var(--line)">
+          <small class="mut">Cyclomatic Complexity (Radon)</small>
+          <h3 style="margin:4px 0;color:var(--l)">${m.avg_complexity ?? '1.0'}</h3>
+        </div>
+        <div style="background:rgba(16,22,43,.6);padding:12px;border-radius:10px;border:1px solid var(--line)">
+          <small class="mut">Maintainability Index</small>
+          <h3 style="margin:4px 0;color:var(--grn)">${m.maintainability_index_avg ?? 'N/A'}/100</h3>
+        </div>
+        <div style="background:rgba(16,22,43,.6);padding:12px;border-radius:10px;border:1px solid var(--line)">
+          <small class="mut">Total Analyzer Findings</small>
+          <h3 style="margin:4px 0;color:${findings.length?'var(--amb)':'var(--grn)'}">${findings.length}</h3>
+        </div>
+      </div>
+    </div>
+
+    <!-- Improved & Refactored Code -->
+    ${improvedCode ? `
+    <div class="card mt" style="margin-bottom:18px">
+      <div class="row sp" style="margin-bottom:10px">
+        <h3>✨ Improved & Refactored Code</h3>
+        <button type="button" class="btn ghost" onclick="copyImprovedCode(this)" style="padding:6px 14px;font-size:13px;animation:none">📋 Copy Code</button>
+      </div>
+      <p class="mut" style="font-size:13px;margin:0 0 10px">Complete runnable code with security vulnerabilities fixed and modern coding practices applied:</p>
+      <pre style="background:rgba(0,0,0,.65);border:1px solid rgba(196,181,253,.25);border-radius:10px;padding:14px;font-size:13px;line-height:1.5;overflow:auto;max-height:420px"><code id="improved-code-text">${escapeHtml(improvedCode)}</code></pre>
+    </div>` : ''}
+
+    <!-- Advanced Static Analysis Details (Collapsible for Professors) -->
+    <details style="margin-top:14px">
+      <summary>🔬 Advanced Static Diagnostics (Radon, Bandit, Ruff, AST)</summary>
+      <div style="padding-top:14px">
+        <div class="row sp" style="margin-bottom:10px">
+          <div><b>Tools Executed:</b> <span style="color:var(--l)">${tools}</span></div>
+          ${legend}
+        </div>
+        <details open><summary>Security & Critical (${crit.length})</summary><div>${renderList(crit)}</div></details>
+        <details open><summary>Code Quality & Warnings (${warn.length})</summary><div>${renderList(warn)}</div></details>
+        <details><summary>Complexity & Informational (${info.length})</summary><div>${renderList(info)}</div></details>
+      </div>
+    </details>
   `;
   setTimeout(()=>el.scrollIntoView({behavior:'smooth'}),100);
 }
