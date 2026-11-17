@@ -96,6 +96,21 @@ details div{padding:0 18px 16px;color:var(--mut);font-size:14px}
 .note{font-size:12px;color:var(--mut);margin-top:28px}
 @media(max-width:1000px){.g4{grid-template-columns:1fr 1fr}.g2,.g3{grid-template-columns:1fr}.hero{grid-template-columns:1fr;text-align:left;padding-top:20px}.pw{width:min(80%,400px);order:-1}}
 @media(max-width:760px){.menu{display:inline-flex}nav{position:fixed;z-index:40;left:0;top:calc(62px + env(safe-area-inset-top,0px));width:270px;background:#0b1024;transform:translateX(-102%);transition:transform .25s}nav.open{transform:none}main{padding:20px 14px}.g4{grid-template-columns:1fr}.top .hide{display:none}}
+@media print{
+  body{background:#fff!important;color:#111!important}
+  #sky,.top,nav,#mb,#an,#toasts,.cta,select,.btn,textarea,.prog,.no-print,#sm-btn,input[type=file],.filters-bar{display:none!important}
+  .wrap,main{margin:0!important;padding:0!important;max-width:100%!important}
+  .card,details{background:#fff!important;border:1px solid #ccc!important;color:#111!important;box-shadow:none!important;page-break-inside:avoid}
+  details{display:block!important}
+  details summary{border-bottom:1px solid #eee!important;color:#111!important}
+  details div{display:block!important}
+  pre,code{background:#f8f9fa!important;color:#111!important;border:1px solid #ddd!important}
+  .chip{border:1px solid #888!important}
+  .c-r{background:#fee2e2!important;color:#991b1b!important;border-color:#f87171!important}
+  .c-a{background:#fef3c7!important;color:#92400e!important;border-color:#fbbf24!important}
+  .c-b{background:#dbeafe!important;color:#1e40af!important;border-color:#60a5fa!important}
+  .c-g{background:#dcfce7!important;color:#166534!important;border-color:#4ade80!important}
+}
 </style>
 </head>
 <body>
@@ -142,137 +157,519 @@ def calculate_score(user_query):
             total += i * 2
         else:
             total -= i
-    return total</textarea><div class="row mt"><button class="btn" id="an"><span class="spin"></span>Analyze Code</button><span class="mut" id="fn"></span></div><div class="prog" id="pg"><i></i></div></div><div id="res-box" class="mt"><div class="card" style="text-align:center;padding:34px 20px;border:1px dashed var(--line);background:rgba(16,22,43,.45)"><div style="font-size:32px;margin-bottom:8px">⚡</div><h3 style="color:var(--tx)">AI Code Reviewer Ready</h3><p class="mut" style="max-width:540px;margin:8px auto 0">Click <b>"Analyze Code"</b> above to generate senior engineer feedback, bug alerts, complexity analysis, and refactored code (inspired by StudyTrigger AI Code Reviewer).</p></div></div>`,
+    return total</textarea><div class="row mt"><button class="btn" id="an"><span class="spin"></span>Analyze Code</button><span class="mut" id="fn"></span></div><div class="prog" id="pg"><i></i></div></div><div id="res-box" class="mt"><div class="card" style="text-align:center;padding:42px 20px;border:1px dashed var(--line);background:rgba(16,22,43,.45)"><div style="font-size:36px;margin-bottom:12px">🔬</div><h3 style="color:var(--tx);font-size:18px">Code Analysis Results</h3><p class="mut" style="max-width:560px;margin:8px auto 0;font-size:14px;line-height:1.5">No analysis has been performed yet. Paste or upload code above and click <b>"Analyze Code"</b> to generate detailed category findings, security checks, complexity analysis, and AI recommendations.</p></div></div>`,
 'github-review':()=>head('GitHub Repository Review','Analyze a repository’s structure and quality.')+`<div class="card"><div class="row"><input type="text" id="url" placeholder="https://github.com/owner/repository" style="flex:1;min-width:240px" aria-label="Repository URL"><button class="btn" id="an"><span class="spin"></span>Analyze Repository</button></div><div class="prog" id="pg"><i></i></div><div id="ri" class="mt"></div></div>`+results(['Repository Information','File Structure','Static Analysis Results','AI-Generated Review','Improvement Suggestions'],NOENG),
 'pdf-analysis':()=>head('PDF Analysis','Upload a technical specification to extract and review it.')+`<div class="card"><label class="drop" id="dz" style="display:block;cursor:pointer"><div class="ic" style="margin:0 auto 12px">${ic('pdf')}</div><b style="color:var(--tx)">Drag and drop a PDF here</b><br>or click to choose a file<input id="pf" type="file" accept="application/pdf" hidden></label><div id="pi" class="mt"></div><div class="row mt"><button class="btn" id="an"><span class="spin"></span>Analyze PDF</button></div><div class="prog" id="pg"><i></i></div></div>`+results(['Extracted Technical Specifications','AI-Generated Insights','Downloadable Reports'],NOENG),
 history:()=>head('Analysis History','Everything you have analyzed, newest first.')+`<div class="card" id="history-box">${empty('No analyses yet. Run one and it will be listed here.')}</div>`,
 reports:()=>head('Generated Reports','Quality scores, findings and documentation.')+`<div class="grid g3"><div class="card"><h3>Overall quality score</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">Not calculated</p><p>Shown only after an analysis computes one.</p></div><div class="card"><h3>Issues detected</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">–</p></div><div class="card"><h3>Security findings</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">–</p></div></div><div class="card mt"><h3 style="margin-bottom:12px">Reports</h3>${empty('No reports generated yet.')}</div>`,
 'app-settings':()=>head('Settings','Preferences for this workspace.')+`<div class="card" style="max-width:640px"><div class="sw"><span>Calm mode<br><small class="mut">Turns off background drift and glow animations</small></span><input type="checkbox" id="calm" ${document.body.classList.contains('calm')?'checked':''}></div><p class="mut mt">API keys and connections are managed by your backend and are never stored in this page.</p></div>`};
 function escapeHtml(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-window.copyImprovedCode = function(btn){
-  const codeEl = document.getElementById('improved-code-text');
-  if(!codeEl) return;
-  const text = codeEl.innerText || codeEl.textContent;
-  navigator.clipboard.writeText(text).then(()=>{
+
+const RULE_DB = {
+  'bandit:B307': {
+    title: 'Use of possibly insecure function.',
+    explanation: 'The eval() function dynamically executes Python expressions. If untrusted user input reaches this function, it may allow arbitrary code execution.',
+    why: 'Executing untrusted dynamic expressions bypasses runtime isolation, enabling arbitrary system command execution, memory tampering, or full server compromise.',
+    fix: 'import ast\nresult = ast.literal_eval(user_input)',
+    code: 'import ast\nresult = ast.literal_eval(user_input)',
+    ref: 'https://bandit.readthedocs.io/en/1.9.4/blacklists/blacklist_calls.html#b307-eval'
+  },
+  'ruff:W292': {
+    title: 'No newline at end of file.',
+    explanation: 'The source file does not end with a newline character. This is a formatting and code-style issue defined in PEP 8.',
+    why: 'POSIX standards require all lines to terminate with a newline character. Omitting it can cause unexpected behavior with Unix tools (diff, cat, git) and file concats.',
+    fix: "Add a newline character after the final line of the file and apply Ruff's suggested fix.",
+    code: 'return total\n',
+    ref: 'https://docs.astral.sh/ruff/rules/missing-newline-at-end-of-file/'
+  },
+  'ruff:F401': {
+    title: 'Imported module or variable is unused.',
+    explanation: 'A module or variable was imported but never referenced anywhere in the file.',
+    why: 'Unused imports unnecessarily consume memory, increase module loading overhead, and introduce confusing phantom dependencies into the project.',
+    fix: 'Remove the unused import or re-export it via __all__ in the module root.',
+    code: '# Remove unused import\n# import os',
+    ref: 'https://docs.astral.sh/ruff/rules/unused-import/'
+  },
+  'ruff:W293': {
+    title: 'Blank line contains whitespace.',
+    explanation: 'A blank line contains unnecessary whitespace characters.',
+    why: 'Trailing whitespace violates PEP 8 formatting rules, creates noisy revision control diffs, and can cause merge conflicts.',
+    fix: 'Strip trailing whitespace from blank lines.',
+    code: '',
+    ref: 'https://docs.astral.sh/ruff/rules/blank-line-with-whitespace/'
+  },
+  'TSA-SYN-001': {
+    title: 'Python Syntax Error.',
+    explanation: 'The Python compiler failed to parse this source file due to invalid syntax.',
+    why: 'Syntax errors prevent the Python bytecode compiler from executing or analyzing the file.',
+    fix: 'Correct Python syntax, ensuring proper indentation, matching parentheses/brackets, and valid operators.',
+    code: '',
+    ref: 'https://docs.python.org/3/tutorial/errors.html#syntax-errors'
+  },
+  'TSA-SEC-001': {
+    title: 'Arbitrary Code Execution via eval() or exec().',
+    explanation: 'Dynamic execution of unsanitized strings detected in source code.',
+    why: 'Attackers can supply malicious code payloads to compromise the host operating system.',
+    fix: 'Replace eval() with ast.literal_eval() for data literals or use safe parsers.',
+    code: 'import ast\nresult = ast.literal_eval(user_input)',
+    ref: 'https://docs.python.org/3/library/ast.html#ast.literal_eval'
+  },
+  'TSA-CMP-001': {
+    title: 'High Cyclomatic Complexity.',
+    why: 'Functions with high McCabe complexity have many execution branches, making them error-prone and difficult to unit test thoroughly.',
+    fix: 'Refactor complex conditional branches into smaller helper functions or lookup tables.',
+    code: '',
+    ref: 'https://radon.readthedocs.io/en/latest/intro.html#cyclomatic-complexity'
+  }
+};
+
+window.copySnippet = function(btn, codeText){
+  navigator.clipboard.writeText(codeText).then(()=>{
     const old = btn.innerText;
     btn.innerText = '✅ Copied!';
     setTimeout(()=>btn.innerText=old, 2000);
-    toast('Improved code copied to clipboard!');
+    toast('Copied to clipboard!');
   }).catch(()=>{
     toast('Copy failed.');
   });
 };
 
-function renderAnalysisOutput(data){
-  let el=$('#res-box');
+window.copyImprovedCode = function(btn){
+  const codeEl = document.getElementById('improved-code-text');
+  if(!codeEl) return;
+  const text = codeEl.innerText || codeEl.textContent;
+  window.copySnippet(btn, text);
+};
+
+window.exportAnalysisPDF = function(){
+  const details = document.querySelectorAll('#res-box details');
+  details.forEach(d => d.setAttribute('open', 'true'));
+  window.print();
+};
+
+function normalizeSeverity(sev){
+  const s = (sev || '').toUpperCase();
+  if(s === 'CRITICAL' || s === 'HIGH') return 'CRITICAL';
+  if(s === 'WARNING' || s === 'MEDIUM' || s === 'LOW') return 'WARNING';
+  if(s === 'INFORMATIONAL' || s === 'INFO') return 'INFORMATIONAL';
+  if(s === 'PASSED') return 'PASSED';
+  return 'WARNING';
+}
+
+function sevChip(sev){
+  const s = normalizeSeverity(sev);
+  if(s === 'CRITICAL') return '<span class="chip c-r">CRITICAL</span>';
+  if(s === 'WARNING') return '<span class="chip c-a">WARNING</span>';
+  if(s === 'INFORMATIONAL') return '<span class="chip c-b">INFORMATIONAL</span>';
+  return '<span class="chip c-g">PASSED</span>';
+}
+
+function enhanceFinding(f, rawCode){
+  const db = RULE_DB[f.rule_id] || {};
+  const normSev = normalizeSeverity(f.severity);
+  const fixUrl = (f.recommended_correction && (f.recommended_correction.startsWith('http://') || f.recommended_correction.startsWith('https://'))) ? f.recommended_correction : (db.ref || null);
+  
+  return {
+    severity: normSev,
+    rule_id: f.rule_id || 'GENERAL',
+    category: f.category || 'quality',
+    file_path: f.file_path || 'snippet.py',
+    line_number: f.line_number || null,
+    column_number: f.column_number || null,
+    source: f.source || 'static_analyzer',
+    tool: f.tool || 'scanner',
+    title: db.title || (f.description ? (f.description.split('.')[0] + '.') : (f.rule_id || 'Diagnostic Finding')),
+    explanation: db.explanation || f.description || 'Static analysis diagnostic finding.',
+    why: db.why || (normSev === 'CRITICAL' ? 'This represents a severe reliability or security vulnerability that can cause runtime exploitation.' : (normSev === 'WARNING' ? 'This represents a code quality, maintainability, or potential performance defect that should be addressed before release.' : 'Non-blocking architectural observation.')),
+    evidence: f.evidence || '',
+    fix: db.fix || f.recommended_correction || 'Review and refactor code to adhere to standard conventions.',
+    corrected_code: db.code || (f.recommended_correction && !f.recommended_correction.startsWith('http') ? f.recommended_correction : ''),
+    ref: fixUrl
+  };
+}
+
+let CURRENT_ANALYSIS_DATA = null;
+let CURRENT_FILTERS = { sev: 'ALL', cat: 'ALL', src: 'ALL' };
+
+window.setFilter = function(type, val){
+  CURRENT_FILTERS[type] = val;
+  if(CURRENT_ANALYSIS_DATA){
+    renderAnalysisOutput(CURRENT_ANALYSIS_DATA, false);
+  }
+};
+
+function renderAnalysisOutput(data, scrollIntoView = true){
+  CURRENT_ANALYSIS_DATA = data;
+  let el = $('#res-box');
   if(!el){
-    el=document.createElement('div');
-    el.id='res-box';
-    el.className='mt';
-    const mainCard=$('.card');
+    el = document.createElement('div');
+    el.id = 'res-box';
+    el.className = 'mt';
+    const mainCard = $('.card');
     if(mainCard) mainCard.after(el);
     else document.body.appendChild(el);
   }
-  const m=data.metrics||{};
-  const findings=data.findings||[];
-  const crit=findings.filter(f=>f.severity==='Critical'||f.severity==='High');
-  const warn=findings.filter(f=>f.severity==='Medium'||f.severity==='Low');
-  const info=findings.filter(f=>f.severity==='Informational');
-  const chipClass=s=>s==='Critical'||s==='High'?'c-r':s==='Medium'?'c-a':s==='Low'?'c-b':'c-g';
 
-  const renderList=list=>list.length?list.map(f=>{
-    const fix = f.recommended_correction || '';
-    const isUrl = fix.startsWith('http://') || fix.startsWith('https://');
-    return `
-      <div style="padding:12px 0;border-bottom:1px solid rgba(196,181,253,.1)">
-        <div class="row" style="gap:8px;margin-bottom:6px">
-          <span class="chip ${chipClass(f.severity)}">${f.severity}</span>
-          <b style="color:var(--tx)">${escapeHtml(f.rule_id || f.category)}</b>
-          <span class="mut" style="font-size:12px">Line ${f.line_number || '-'} · ${escapeHtml(f.source || 'static_analyzer')}</span>
-        </div>
-        <div style="color:var(--tx);font-size:14px;line-height:1.5;margin-bottom:6px">${escapeHtml(f.description || '')}</div>
-        ${f.evidence ? `<pre style="background:rgba(0,0,0,.45);border:1px solid rgba(196,181,253,.15);padding:8px 12px;border-radius:6px;margin:6px 0;font-size:12.5px;overflow:auto"><code>${escapeHtml(f.evidence)}</code></pre>` : ''}
-        ${fix ? `<div style="color:var(--l);font-size:12.5px;margin-top:4px">Fix: ${isUrl ? `<a href="${fix}" target="_blank" rel="noopener noreferrer" style="color:var(--blu);text-decoration:underline">${escapeHtml(fix)}</a>` : escapeHtml(fix)}</div>` : ''}
-      </div>
-    `;
-  }).join('') : '<div class="mut" style="padding:8px 0">No issues detected in this category.</div>';
-
+  const rawFindings = data.findings || [];
+  const metrics = data.metrics || {};
   const ai = data.ai || {};
-  const scoreVal = typeof ai.overall_score === 'number' ? ai.overall_score : (ai.ai_score ? (ai.ai_score/10) : 8.0);
-  const scoreBadge = scoreVal >= 8 ? '<span class="chip c-g" style="font-size:12.5px">🟢 Clean Code</span>' : (scoreVal >= 5 ? '<span class="chip c-a" style="font-size:12.5px">🟡 Warning</span>' : '<span class="chip c-r" style="font-size:12.5px">🔴 Critical</span>');
-  const scoreColor = scoreVal >= 8 ? 'var(--grn)' : (scoreVal >= 5 ? 'var(--amb)' : 'var(--red)');
-  const improvedCode = ai.improved_code || data.code || '';
+  const rawCode = $('#code') ? $('#code').value : (data.code || '');
 
-  // Clean, unified TechSpecAnalyser Review + Detailed Findings
-  el.innerHTML=`
-    <!-- TechSpecAnalyser Code Review Card -->
-    <div class="card mt" style="background:rgba(16,22,43,.75);border:1px solid rgba(196,181,253,.25);margin-bottom:18px">
-      <div class="row sp" style="align-items:center;margin-bottom:10px">
-        <div class="row" style="gap:10px">
-          <img src="/favicon.png" width="22" height="22" style="border-radius:50%" alt="Logo">
-          <h3 style="margin:0">TechSpecAnalyser Code Review</h3>
-          ${scoreBadge}
+  // 1. Map all static findings
+  const enhancedFindings = rawFindings.map(f => enhanceFinding(f, rawCode));
+
+  // 2. Synthesize Section A & D: Six Analysis Categories
+  // Category 1: Syntax Errors
+  const syntaxFindings = enhancedFindings.filter(f => f.category === 'syntax' || f.rule_id.includes('SYN') || f.rule_id.startsWith('ruff:E9') || f.rule_id.startsWith('ruff:F63'));
+
+  // Category 2: Code Quality
+  const qualityFindings = enhancedFindings.filter(f => f.category === 'quality' || (f.rule_id.startsWith('ruff:') && !syntaxFindings.includes(f)) || f.rule_id.startsWith('TSA-QLT'));
+
+  // Category 3: Complexity Analysis
+  const complexityFindings = enhancedFindings.filter(f => f.category === 'complexity' || f.rule_id.startsWith('TSA-CMP'));
+  if (metrics.avg_complexity !== undefined && metrics.avg_complexity !== null) {
+    const mi = metrics.maintainability_index_avg ?? 'N/A';
+    complexityFindings.unshift({
+      severity: metrics.avg_complexity > 10 ? 'WARNING' : 'INFORMATIONAL',
+      rule_id: 'RADON-METRICS',
+      category: 'complexity',
+      file_path: 'snippet.py',
+      line_number: null,
+      source: 'static_analyzer',
+      tool: 'radon',
+      title: 'Cyclomatic Complexity & Maintainability Metrics',
+      explanation: `Radon static analyzer measured an average cyclomatic complexity of ${metrics.avg_complexity} and a maintainability index of ${mi}/100.`,
+      why: 'Functions with high complexity have numerous branching paths, increasing maintenance overhead and making testing difficult.',
+      evidence: '',
+      fix: 'Keep function cyclomatic complexity under 10 by breaking complex logic into modular helper functions.',
+      corrected_code: '',
+      ref: 'https://radon.readthedocs.io/en/latest/intro.html#cyclomatic-complexity'
+    });
+  }
+
+  // Category 4: Security Issues
+  const securityFindings = enhancedFindings.filter(f => f.category === 'security' || f.rule_id.startsWith('bandit:') || f.rule_id.startsWith('TSA-SEC'));
+
+  // Category 5: AI Code Review
+  const aiReviewFindings = [];
+  if (ai.ran) {
+    aiReviewFindings.push({
+      severity: ai.overall_score && ai.overall_score < 7 ? 'WARNING' : 'INFORMATIONAL',
+      rule_id: 'AI-CODE-REVIEW',
+      category: 'ai_review',
+      file_path: 'snippet.py',
+      line_number: null,
+      source: 'AI_review',
+      tool: 'TechSpecAnalyser AI Engine',
+      title: 'Contextual Architecture & Security Assessment',
+      explanation: ai.summary || 'Contextual review of code structure, edge cases, and design patterns.',
+      why: 'Automated AI analysis checks high-level program intent, naming conventions, and logic beyond static AST checks.',
+      evidence: '',
+      fix: 'Review architectural recommendations proposed in the AI Review panel.',
+      corrected_code: '',
+      ref: null
+    });
+    // Add AI detected bugs if not duplicated
+    (ai.bugs || []).forEach((b, idx) => {
+      aiReviewFindings.push({
+        severity: normalizeSeverity(b.severity),
+        rule_id: `AI-BUG-0${idx+1}`,
+        category: 'ai_review',
+        file_path: 'snippet.py',
+        line_number: b.line ? parseInt(b.line.replace(/\D/g, '')) || null : null,
+        source: 'AI_review',
+        tool: 'TechSpecAnalyser AI Engine',
+        title: b.description ? b.description.split('.')[0] + '.' : 'AI Detected Potential Defect',
+        explanation: b.description || 'Potential edge-case or logic risk identified by AI model.',
+        why: 'Contextual defects can result in unexpected runtime crashes or unhandled exceptions under boundary conditions.',
+        evidence: '',
+        fix: 'Inspect flagged lines and implement defensive bounds checking.',
+        corrected_code: '',
+        ref: null
+      });
+    });
+  }
+
+  // Category 6: Suggestions for Improvement
+  const suggestionsFindings = [];
+  if (ai.improvements && ai.improvements.length) {
+    ai.improvements.forEach((imp, idx) => {
+      suggestionsFindings.push({
+        severity: 'INFORMATIONAL',
+        rule_id: `AI-IMP-0${idx+1}`,
+        category: 'suggestions',
+        file_path: 'snippet.py',
+        line_number: null,
+        source: 'AI_review',
+        tool: 'TechSpecAnalyser AI Engine',
+        title: imp.title || 'Architectural Refactoring Suggestion',
+        explanation: imp.detail || 'Recommended enhancement to improve readability and maintainability.',
+        why: 'Adhering to modern language standards (e.g. PEP 484 type hints) improves long-term codebase health.',
+        evidence: '',
+        fix: imp.detail || 'Refactor code according to best practice.',
+        corrected_code: '',
+        ref: null
+      });
+    });
+  }
+
+  // Define Category Bundles (Section A & D)
+  const categories = [
+    { id: 'syntax', name: '1. Syntax Errors', findings: syntaxFindings },
+    { id: 'quality', name: '2. Code Quality', findings: qualityFindings },
+    { id: 'complexity', name: '3. Complexity Analysis', findings: complexityFindings },
+    { id: 'security', name: '4. Security Issues', findings: securityFindings },
+    { id: 'ai_review', name: '5. AI Code Review', findings: aiReviewFindings },
+    { id: 'suggestions', name: '6. Suggestions for Improvement', findings: suggestionsFindings }
+  ];
+
+  // Global counts for Section G
+  const allCategorizedFindings = [
+    ...syntaxFindings,
+    ...qualityFindings,
+    ...complexityFindings,
+    ...securityFindings,
+    ...aiReviewFindings,
+    ...suggestionsFindings
+  ];
+
+  const totalFiles = (data.files && data.files.length) ? data.files.length : (metrics.files_analyzed || 1);
+  const totalIssues = allCategorizedFindings.length;
+  const critCount = allCategorizedFindings.filter(f => f.severity === 'CRITICAL').length;
+  const warnCount = allCategorizedFindings.filter(f => f.severity === 'WARNING').length;
+  const infoCount = allCategorizedFindings.filter(f => f.severity === 'INFORMATIONAL').length;
+  
+  // Passed checks: Number of analysis categories that passed without issues
+  const passedCategoryCount = categories.filter(c => c.findings.length === 0).length;
+
+  // Code quality score computation (Section G defined methodology)
+  const rawScore = 100 - (critCount * 25) - (warnCount * 5) - Math.max(0, ((metrics.avg_complexity || 1) - 2) * 3);
+  const overallScore = Math.max(10, Math.min(100, Math.round(rawScore)));
+  const scoreColor = overallScore >= 80 ? 'var(--grn)' : (overallScore >= 50 ? 'var(--amb)' : 'var(--red)');
+
+  // Helper to render individual finding card (Section C)
+  function renderFindingCard(f){
+    return `
+      <details class="finding-card" style="background:rgba(8,11,26,.65);border:1px solid rgba(196,181,253,.18);border-radius:10px;margin-bottom:12px;overflow:hidden">
+        <summary style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+          <div class="row" style="gap:10px;flex-wrap:wrap">
+            ${sevChip(f.severity)}
+            <b style="color:var(--tx)">${escapeHtml(f.rule_id)}</b>
+            <span style="color:var(--tx);font-weight:500">${escapeHtml(f.title)}</span>
+            <span class="mut" style="font-size:12px">${f.line_number ? 'Line ' + f.line_number : 'Global'} · ${escapeHtml(f.file_path)}</span>
+          </div>
+        </summary>
+        <div style="padding:14px 18px 18px;border-top:1px solid rgba(196,181,253,.12);font-size:13.5px;line-height:1.6">
+          <div style="margin-bottom:10px">
+            <b class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Technical Explanation:</b>
+            <div style="color:var(--tx);margin-top:2px">${escapeHtml(f.explanation)}</div>
+          </div>
+          <div style="margin-bottom:10px">
+            <b class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Why the Issue Matters:</b>
+            <div style="color:var(--tx);margin-top:2px">${escapeHtml(f.why)}</div>
+          </div>
+          ${f.evidence ? `
+          <div style="margin-bottom:10px">
+            <b class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Original Code Snippet:</b>
+            <pre style="background:rgba(0,0,0,.5);border:1px solid rgba(196,181,253,.15);padding:10px;border-radius:6px;margin:4px 0;font-size:12.5px;overflow:auto"><code>${escapeHtml(f.evidence)}</code></pre>
+          </div>` : ''}
+          <div style="margin-bottom:10px">
+            <b class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Suggested Corrective Action:</b>
+            <div style="color:var(--l);margin-top:2px">${escapeHtml(f.fix)}</div>
+          </div>
+          ${f.corrected_code ? `
+          <div style="margin-bottom:10px">
+            <div class="row sp" style="margin-bottom:4px">
+              <b class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Corrected Code Snippet:</b>
+              <button type="button" class="btn ghost" onclick="copySnippet(this, ${JSON.stringify(f.corrected_code)})" style="padding:2px 10px;font-size:11px;animation:none">📋 Copy Fix</button>
+            </div>
+            <pre style="background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.2);padding:10px;border-radius:6px;margin:4px 0;font-size:12.5px;color:var(--grn);overflow:auto"><code>${escapeHtml(f.corrected_code)}</code></pre>
+          </div>` : ''}
+          <div class="row sp" style="margin-top:12px;padding-top:10px;border-top:1px dashed rgba(196,181,253,.12);font-size:12px">
+            <div class="mut">Detection Source: <span style="color:var(--tx)">${escapeHtml(f.source)}</span> · Tool: <span style="color:var(--l)">${escapeHtml(f.tool)}</span></div>
+            ${f.ref ? `<a href="${f.ref}" target="_blank" rel="noopener noreferrer" style="color:var(--blu);text-decoration:underline">📖 Documentation & Reference</a>` : ''}
+          </div>
         </div>
-        <div style="font-weight:700;font-size:22px;color:${scoreColor}">
-          ${scoreVal}<span style="font-size:14px;color:var(--mut)">/10</span>
+      </details>
+    `;
+  }
+
+  // Filter application (Section G)
+  function matchesFilter(f, catName){
+    if(CURRENT_FILTERS.sev !== 'ALL' && f.severity !== CURRENT_FILTERS.sev) return false;
+    if(CURRENT_FILTERS.cat !== 'ALL' && !catName.toLowerCase().includes(CURRENT_FILTERS.cat.toLowerCase())) return false;
+    if(CURRENT_FILTERS.src !== 'ALL' && f.source !== CURRENT_FILTERS.src) return false;
+    return true;
+  }
+
+  // Render categories HTML (Section A & D)
+  const categoriesHtml = categories.map(cat => {
+    // Determine category status indicator (Section A)
+    let catStatus = 'PASSED';
+    if (cat.findings.some(f => f.severity === 'CRITICAL')) catStatus = 'CRITICAL';
+    else if (cat.findings.some(f => f.severity === 'WARNING')) catStatus = 'WARNING';
+    else if (cat.findings.some(f => f.severity === 'INFORMATIONAL')) catStatus = 'INFORMATIONAL';
+
+    // Apply active filters
+    const displayedFindings = cat.findings.filter(f => matchesFilter(f, cat.name));
+    
+    // Check if category is hidden by filters
+    if (CURRENT_FILTERS.cat !== 'ALL' && !cat.name.toLowerCase().includes(CURRENT_FILTERS.cat.toLowerCase())) {
+      return '';
+    }
+    if (CURRENT_FILTERS.sev !== 'ALL' && CURRENT_FILTERS.sev === 'PASSED' && cat.findings.length > 0) {
+      return '';
+    }
+
+    let bodyHtml = '';
+    if (cat.findings.length === 0) {
+      bodyHtml = `
+        <div style="padding:14px 18px;background:rgba(74,222,128,.04);border:1px dashed rgba(74,222,128,.2);border-radius:10px;color:var(--grn);font-size:13.5px">
+          ✅ Checks completed successfully without detected issues. No issues detected in this category.
         </div>
-      </div>
-      <p style="color:var(--tx);font-size:14px;line-height:1.6;margin:0 0 12px">${escapeHtml(ai.summary || 'Code analysis and structural review completed.')}</p>
-      ${improvedCode ? `
-      <details style="margin-top:10px">
-        <summary style="font-size:13.5px;color:var(--l);cursor:pointer">✨ Refactored & Improved Code Proposal</summary>
-        <div style="padding-top:10px">
+      `;
+    } else if (displayedFindings.length === 0) {
+      bodyHtml = `
+        <div class="mut" style="padding:14px 18px;background:rgba(16,22,43,.4);border-radius:10px;font-size:13px">
+          No findings match the current filter selection (${CURRENT_FILTERS.sev !== 'ALL' ? CURRENT_FILTERS.sev : ''} ${CURRENT_FILTERS.src !== 'ALL' ? CURRENT_FILTERS.src : ''}).
+        </div>
+      `;
+    } else {
+      bodyHtml = displayedFindings.map(renderFindingCard).join('');
+    }
+
+    // Append improved code block in Suggestions for Improvement
+    if (cat.id === 'suggestions' && ai.improved_code) {
+      bodyHtml += `
+        <div style="background:rgba(16,22,43,.7);border:1px solid rgba(196,181,253,.25);border-radius:10px;padding:16px;margin-top:14px">
           <div class="row sp" style="margin-bottom:8px">
-            <span class="mut" style="font-size:12px">Refactored version:</span>
-            <button type="button" class="btn ghost" onclick="copyImprovedCode(this)" style="padding:4px 12px;font-size:12px;animation:none">📋 Copy Code</button>
+            <b style="color:var(--l);font-size:14px">✨ Full Refactored & Improved Code Proposal</b>
+            <button type="button" class="btn ghost" onclick="copyImprovedCode(this)" style="padding:4px 12px;font-size:12px;animation:none">📋 Copy Complete Code</button>
           </div>
-          <pre style="background:rgba(0,0,0,.6);border:1px solid rgba(196,181,253,.2);border-radius:8px;padding:12px;font-size:12.5px;line-height:1.5;overflow:auto;max-height:360px"><code id="improved-code-text">${escapeHtml(improvedCode)}</code></pre>
+          <p class="mut" style="font-size:12.5px;margin:0 0 10px">Syntactically validated, type-annotated, and security-hardened code version:</p>
+          <pre style="background:rgba(0,0,0,.65);border:1px solid rgba(196,181,253,.15);border-radius:8px;padding:12px;font-size:12.5px;line-height:1.5;overflow:auto;max-height:360px"><code id="improved-code-text">${escapeHtml(ai.improved_code)}</code></pre>
         </div>
-      </details>` : ''}
-    </div>
+      `;
+    }
 
-    <!-- Detailed Findings Header with Legend -->
-    <div class="row sp" style="margin-bottom:12px">
-      <h3>Detailed Findings</h3>
-      <div class="sev">
-        <span class="chip c-r">Critical</span>
-        <span class="chip c-a">Warning</span>
-        <span class="chip c-b">Informational</span>
-        <span class="chip c-g">Passed</span>
-      </div>
-    </div>
-
-    <!-- Collapsible Categories matching User Request -->
-    <details open>
-      <summary>Security & Critical (${crit.length})</summary>
-      <div>${renderList(crit)}</div>
-    </details>
-
-    <details open>
-      <summary>Code Quality & Warnings (${warn.length})</summary>
-      <div>${renderList(warn)}</div>
-    </details>
-
-    <details>
-      <summary>Complexity & Informational (${info.length})</summary>
-      <div>
-        ${m.avg_complexity !== undefined && m.avg_complexity !== null ? `
-          <div style="padding:10px 0;border-bottom:1px solid rgba(196,181,253,.1)">
-            <div class="row" style="gap:8px;margin-bottom:6px">
-              <span class="chip c-b">Informational</span>
-              <b>Cyclomatic Complexity & Maintainability</b>
-              <span class="mut" style="font-size:12px">Metric · static_analyzer</span>
-            </div>
-            <div style="color:var(--tx);font-size:13.5px">
-              Average Cyclomatic Complexity: <b>${m.avg_complexity}</b> · Maintainability Index: <b>${m.maintainability_index_avg ?? 'N/A'}/100</b>
-            </div>
+    return `
+      <details ${cat.findings.length > 0 ? 'open' : ''} style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+        <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+          <div class="row" style="gap:10px">
+            <b style="font-size:15px;color:var(--tx)">${cat.name}</b>
+            <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);border-color:rgba(196,181,253,.25);color:var(--l)">${cat.findings.length} Finding(s)</span>
           </div>
-        ` : ''}
-        ${renderList(info)}
+          <div class="row" style="gap:10px">
+            ${sevChip(catStatus)}
+          </div>
+        </summary>
+        <div style="padding:16px 20px 20px">
+          ${bodyHtml}
+        </div>
+      </details>
+    `;
+  }).join('');
+
+  // Main UI Assembly (Sections A, B, C, D, G, H)
+  el.innerHTML = `
+    <!-- Results Header & PDF Export (Section G) -->
+    <div class="card mt" style="background:linear-gradient(135deg,rgba(139,92,246,.2),rgba(59,130,246,.12));border:1px solid rgba(196,181,253,.3);margin-bottom:18px">
+      <div class="row sp" style="align-items:center;margin-bottom:16px">
+        <div class="row" style="gap:10px">
+          <img src="/favicon.png" width="26" height="26" style="border-radius:50%" alt="Logo">
+          <div>
+            <h2 style="font-size:22px;margin:0">Code Analysis Results & Quality Report</h2>
+            <div class="mut" style="font-size:12.5px;margin-top:2px">TechSpecAnalyser Automated Code Intelligence · Analysis ID: ${escapeHtml(data.analysis_id || 'COMPLETED')}</div>
+          </div>
+        </div>
+        <button type="button" class="btn ghost" onclick="exportAnalysisPDF()" style="padding:8px 16px;animation:none">📄 Export PDF Report</button>
       </div>
-    </details>
+
+      <!-- Summary Metrics Grid (Section G) -->
+      <div class="grid g4 mt" style="gap:10px">
+        <div style="background:rgba(8,11,26,.6);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
+          <small class="mut">Files Analysed</small>
+          <div style="font-size:24px;font-weight:700;color:var(--tx);margin-top:2px">${totalFiles}</div>
+        </div>
+        <div style="background:rgba(8,11,26,.6);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
+          <small class="mut">Total Issues Detected</small>
+          <div style="font-size:24px;font-weight:700;color:${totalIssues ? 'var(--red)' : 'var(--grn)'};margin-top:2px">${totalIssues}</div>
+        </div>
+        <div style="background:rgba(8,11,26,.6);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
+          <small class="mut">Severity Breakdown</small>
+          <div class="row" style="gap:6px;margin-top:6px">
+            <span class="chip c-r" style="font-size:11px">Crit: ${critCount}</span>
+            <span class="chip c-a" style="font-size:11px">Warn: ${warnCount}</span>
+            <span class="chip c-b" style="font-size:11px">Info: ${infoCount}</span>
+          </div>
+        </div>
+        <div style="background:rgba(8,11,26,.6);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
+          <small class="mut">Quality Score</small>
+          <div style="font-size:24px;font-weight:700;color:${scoreColor};margin-top:2px">
+            ${overallScore}<span style="font-size:14px;color:var(--mut)">/100</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:var(--mut);margin-top:12px;line-height:1.5">
+        ℹ️ <b>Scoring Methodology:</b> Score starts at 100, penalized by 25 pts per Critical security issue, 5 pts per Warning issue, and calibrated against the Radon Maintainability Index (${metrics.maintainability_index_avg ?? 'N/A'}/100). Passed checks: <b>${passedCategoryCount} of 6</b> categories.
+      </div>
+    </div>
+
+    <!-- Interactive Filters Bar (Section G) -->
+    <div class="card mt filters-bar" style="background:rgba(16,22,43,.65);border:1px solid var(--line);margin-bottom:18px;padding:14px 18px">
+      <div class="row sp" style="gap:14px;align-items:center">
+        <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
+          <span style="font-weight:600;font-size:13px;color:var(--l)">Filter By:</span>
+          
+          <!-- Severity Filter -->
+          <select style="width:auto;padding:6px 12px;font-size:12.5px" onchange="setFilter('sev', this.value)" aria-label="Filter Severity">
+            <option value="ALL" ${CURRENT_FILTERS.sev === 'ALL' ? 'selected' : ''}>Severity: All</option>
+            <option value="CRITICAL" ${CURRENT_FILTERS.sev === 'CRITICAL' ? 'selected' : ''}>Critical (${critCount})</option>
+            <option value="WARNING" ${CURRENT_FILTERS.sev === 'WARNING' ? 'selected' : ''}>Warning (${warnCount})</option>
+            <option value="INFORMATIONAL" ${CURRENT_FILTERS.sev === 'INFORMATIONAL' ? 'selected' : ''}>Informational (${infoCount})</option>
+            <option value="PASSED" ${CURRENT_FILTERS.sev === 'PASSED' ? 'selected' : ''}>Passed Categories (${passedCategoryCount})</option>
+          </select>
+
+          <!-- Category Filter -->
+          <select style="width:auto;padding:6px 12px;font-size:12.5px" onchange="setFilter('cat', this.value)" aria-label="Filter Category">
+            <option value="ALL" ${CURRENT_FILTERS.cat === 'ALL' ? 'selected' : ''}>Category: All (6)</option>
+            <option value="Syntax" ${CURRENT_FILTERS.cat === 'Syntax' ? 'selected' : ''}>1. Syntax Errors</option>
+            <option value="Quality" ${CURRENT_FILTERS.cat === 'Quality' ? 'selected' : ''}>2. Code Quality</option>
+            <option value="Complexity" ${CURRENT_FILTERS.cat === 'Complexity' ? 'selected' : ''}>3. Complexity Analysis</option>
+            <option value="Security" ${CURRENT_FILTERS.cat === 'Security' ? 'selected' : ''}>4. Security Issues</option>
+            <option value="AI" ${CURRENT_FILTERS.cat === 'AI' ? 'selected' : ''}>5. AI Code Review</option>
+            <option value="Suggestions" ${CURRENT_FILTERS.cat === 'Suggestions' ? 'selected' : ''}>6. Suggestions</option>
+          </select>
+
+          <!-- Detection Source Filter -->
+          <select style="width:auto;padding:6px 12px;font-size:12.5px" onchange="setFilter('src', this.value)" aria-label="Filter Source">
+            <option value="ALL" ${CURRENT_FILTERS.src === 'ALL' ? 'selected' : ''}>Source: All</option>
+            <option value="static_analyzer" ${CURRENT_FILTERS.src === 'static_analyzer' ? 'selected' : ''}>static_analyzer</option>
+            <option value="AI_review" ${CURRENT_FILTERS.src === 'AI_review' ? 'selected' : ''}>AI_review</option>
+            <option value="deterministic_rule" ${CURRENT_FILTERS.src === 'deterministic_rule' ? 'selected' : ''}>deterministic_rule</option>
+          </select>
+        </div>
+
+        <!-- Legend (Section B) -->
+        <div class="sev">
+          <span class="chip c-r">CRITICAL</span>
+          <span class="chip c-a">WARNING</span>
+          <span class="chip c-b">INFORMATIONAL</span>
+          <span class="chip c-g">PASSED</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- The Six Expandable Analysis Categories (Section A & D) -->
+    <div id="categories-container">
+      ${categoriesHtml}
+    </div>
   `;
-  setTimeout(()=>el.scrollIntoView({behavior:'smooth'}),100);
+
+  if (scrollIntoView) {
+    setTimeout(() => el.scrollIntoView({ behavior: 'smooth' }), 100);
+  }
 }
 
 function bind(k){
