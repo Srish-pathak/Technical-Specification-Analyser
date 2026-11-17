@@ -53,21 +53,22 @@ Output strictly valid JSON with no markdown backticks."""
 
     # Models to try in order of preference
     candidate_models = [
-        model,
-        "gemini-3.8-flash",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-2.5-flash",
         "gemini-2.0-flash",
         "gemini-1.5-flash",
-        "gemini-2.5-flash"
+        model
     ]
 
     seen = set()
-    models = [m for m in candidate_models if not (m in seen or seen.add(m))]
+    models = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
 
     last_error = ""
     for target_model in models:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model}:generateContent?key={api_key}"
         try:
-            with httpx.Client(timeout=45.0) as client:
+            with httpx.Client(timeout=60.0) as client:
                 resp = client.post(
                     url,
                     headers={"Content-Type": "application/json"},
