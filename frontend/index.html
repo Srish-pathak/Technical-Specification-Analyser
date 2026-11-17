@@ -298,25 +298,48 @@ function sevChip(sev){
 }
 
 function enhanceFinding(f, rawCode){
-  const db = RULE_DB[f.rule_id] || {};
+  const ruleId = f.rule_id || f.rule || 'DIAGNOSTIC';
+  const db = RULE_DB[ruleId] || {};
   const normSev = normalizeSeverity(f.severity);
-  const fixUrl = (f.recommended_correction && (f.recommended_correction.startsWith('http://') || f.recommended_correction.startsWith('https://'))) ? f.recommended_correction : (db.ref || null);
+  const fixUrl = f.reference || f.ref || (f.recommended_correction && (f.recommended_correction.startsWith('http://') || f.recommended_correction.startsWith('https://')) ? f.recommended_correction : (db.ref || null));
+  const desc = f.description || f.explanation || f.message || '';
   
+  // Clean, meaningful human-readable title
+  let derivedTitle = f.title || db.title;
+  if(!derivedTitle){
+    if(desc){
+      const first = desc.split('.')[0].trim();
+      derivedTitle = first.length > 70 ? (first.slice(0, 70) + '...') : (first.endsWith('.') ? first : first + '.');
+    } else {
+      derivedTitle = ruleId + ' Finding';
+    }
+  }
+
+  // Exact file path and line number
+  const filePath = f.file_path || f.file || (rawCode ? 'snippet.py' : 'unknown');
+  const lineNum = f.line_number ?? f.line ?? null;
+  const colNum = f.column_number ?? f.col ?? null;
+
+  // Code snippet & fix
+  const evidence = f.evidence || f.code || '';
+  const fix = f.recommended_correction || f.fix || db.fix || 'Review and refactor code to adhere to standard conventions.';
+  const why = f.why || db.why || (normSev === 'CRITICAL' ? 'This represents a critical vulnerability or high-impact defect that can lead to arbitrary execution, denial of service, or runtime failure.' : (normSev === 'WARNING' ? 'This violates reliability or maintainability standards and may introduce edge-case failures, performance bottlenecks, or regressions.' : 'Informational observation regarding code style, complexity, or design conventions.'));
+
   return {
     severity: normSev,
-    rule_id: f.rule_id || 'GENERAL',
+    rule_id: ruleId,
     category: f.category || 'quality',
-    file_path: f.file_path || 'snippet.py',
-    line_number: f.line_number || null,
-    column_number: f.column_number || null,
+    file_path: filePath,
+    line_number: lineNum,
+    column_number: colNum,
     source: f.source || 'static_analyzer',
-    tool: f.tool || 'scanner',
-    title: db.title || (f.description ? (f.description.split('.')[0] + '.') : (f.rule_id || 'Diagnostic Finding')),
-    explanation: db.explanation || f.description || 'Static analysis diagnostic finding.',
-    why: db.why || (normSev === 'CRITICAL' ? 'This represents a severe reliability or security vulnerability that can cause runtime exploitation.' : (normSev === 'WARNING' ? 'This represents a code quality, maintainability, or potential performance defect that should be addressed before release.' : 'Non-blocking architectural observation.')),
-    evidence: f.evidence || '',
-    fix: db.fix || f.recommended_correction || 'Review and refactor code to adhere to standard conventions.',
-    corrected_code: db.code || (f.recommended_correction && !f.recommended_correction.startsWith('http') ? f.recommended_correction : ''),
+    tool: f.tool || f.source || 'static_analyzer',
+    title: derivedTitle,
+    explanation: desc || db.explanation || 'Diagnostic finding identified during static code analysis.',
+    why: why,
+    evidence: evidence,
+    fix: fix,
+    corrected_code: db.code || (fix && !fix.startsWith('http') && fix.includes('\n') ? fix : ''),
     ref: fixUrl
   };
 }
@@ -747,14 +770,15 @@ function renderGithubOutput(data, scrollIntoView = true) {
   const tree = data.tree || {};
   const struct = tree.structure || {};
   const metrics = data.metrics || {};
-  const findings = data.findings || [];
+  const rawFindings = data.findings || [];
+  const enhancedFindings = rawFindings.map(f => enhanceFinding(f));
   const ai = data.ai || {};
   const suggestions = ai.suggestions || [];
 
-  // Severity counts
-  const critCount = findings.filter(f => f.severity === 'Critical' || f.severity === 'High').length;
-  const warnCount = findings.filter(f => f.severity === 'Medium' || f.severity === 'Low' || f.severity === 'Warning').length;
-  const infoCount = findings.filter(f => f.severity === 'Informational').length;
+  // Severity counts from enhanced findings
+  const critCount = enhancedFindings.filter(f => f.severity === 'CRITICAL').length;
+  const warnCount = enhancedFindings.filter(f => f.severity === 'WARNING').length;
+  const infoCount = enhancedFindings.filter(f => f.severity === 'INFORMATIONAL').length;
 
   // Health Score color
   const score = metrics.health_score ?? 85;
@@ -918,13 +942,9 @@ function renderGithubOutput(data, scrollIntoView = true) {
   `;
 
   // 3. Static Analysis Results Section
-  const filteredFindings = findings.filter(f => {
+  const filteredFindings = enhancedFindings.filter(f => {
     if (GH_FILTERS.sev !== 'ALL') {
-      const sev = (f.severity || '').toLowerCase();
-      const target = GH_FILTERS.sev.toLowerCase();
-      if (target === 'critical' && sev !== 'critical' && sev !== 'high') return false;
-      if (target === 'warning' && sev !== 'warning' && sev !== 'medium' && sev !== 'low') return false;
-      if (target === 'informational' && sev !== 'informational' && sev !== 'info') return false;
+      if (f.severity !== GH_FILTERS.sev) return false;
     }
     if (GH_FILTERS.tool !== 'ALL') {
       const tool = (f.tool || '').toLowerCase();
@@ -933,7 +953,7 @@ function renderGithubOutput(data, scrollIntoView = true) {
     return true;
   });
 
-  const staticFindingsHtml = findings.length === 0 ? `
+  const staticFindingsHtml = enhancedFindings.length === 0 ? `
     <div style="padding:16px 20px;background:rgba(74,222,128,.04);border:1px dashed rgba(74,222,128,.2);border-radius:10px;color:var(--grn);font-size:13.5px">
       ✅ Checks completed successfully without detected issues. No security vulnerabilities or linting errors detected across source files.
     </div>
@@ -942,57 +962,57 @@ function renderGithubOutput(data, scrollIntoView = true) {
       No static analysis findings match the selected filter (${GH_FILTERS.sev} / ${GH_FILTERS.tool}).
     </div>
   ` : filteredFindings.map((f, i) => {
-    const sev = f.severity || 'Warning';
-    const isCrit = sev === 'Critical' || sev === 'High';
-    const isWarn = sev === 'Warning' || sev === 'Medium' || sev === 'Low';
-    const chipClass = isCrit ? 'c-r' : (isWarn ? 'c-a' : 'c-b');
     const codeId = `gh-snip-${i}`;
+    const chipClass = f.severity === 'CRITICAL' ? 'c-r' : (f.severity === 'WARNING' ? 'c-a' : 'c-b');
 
     return `
-      <div style="margin-bottom:12px;background:rgba(8,11,26,.7);border:1px solid rgba(196,181,253,.2);border-radius:10px;padding:14px;box-shadow:0 4px 14px rgba(0,0,0,.25)">
-        <div class="row sp" style="align-items:flex-start;margin-bottom:8px">
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span class="chip ${chipClass}" style="font-size:11px;font-weight:700">${escapeHtml(sev.toUpperCase())}</span>
-            <code style="font-size:12px;color:var(--l);background:rgba(196,181,253,.1);padding:2px 6px;border-radius:4px">${escapeHtml(f.rule || 'STATIC_RULE')}</code>
-            <span class="mut" style="font-size:12px">via ${escapeHtml(f.tool || 'static_analyzer')}</span>
+      <details class="finding-card" style="margin-bottom:12px;background:rgba(8,11,26,.7);border:1px solid rgba(196,181,253,.2);border-radius:10px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.25)">
+        <summary style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+          <div class="row" style="gap:8px;flex-wrap:wrap">
+            <span class="chip ${chipClass}" style="font-size:11px;font-weight:700">${f.severity}</span>
+            <code style="font-size:12px;color:var(--l);background:rgba(196,181,253,.1);padding:2px 6px;border-radius:4px">${escapeHtml(f.rule_id)}</code>
+            <b style="color:var(--tx);font-size:13.5px">${escapeHtml(f.title)}</b>
+            <span class="mut" style="font-size:12px">via ${escapeHtml(f.tool)}</span>
           </div>
-          <span style="font-family:monospace;font-size:12px;color:var(--tx);background:rgba(255,255,255,.05);padding:2px 8px;border-radius:4px">
-            📁 ${escapeHtml(f.file || 'unknown')}${f.line ? ' : L' + f.line : ''}
+          <span style="font-family:monospace;font-size:12px;color:var(--tx);background:rgba(255,255,255,.05);padding:3px 8px;border-radius:4px">
+            📁 ${escapeHtml(f.file_path)}${f.line_number ? ' : L' + f.line_number : ''}
           </span>
-        </div>
-
-        <h4 style="margin:4px 0 6px;font-size:14.5px;color:var(--tx)">${escapeHtml(f.title || f.message || 'Static Analysis Finding')}</h4>
-        <p class="mut" style="font-size:13px;margin:0 0 10px;line-height:1.5">${escapeHtml(f.explanation || f.message || '')}</p>
-
-        ${f.code ? `
-          <div style="margin:8px 0">
-            <small class="mut" style="font-weight:600">Problematic Code Snippet:</small>
-            <pre style="background:rgba(0,0,0,.6);border:1px solid rgba(248,113,113,.2);border-radius:6px;padding:8px 12px;font-size:12px;margin:4px 0 8px;color:#fca5a5;overflow:auto"><code>${escapeHtml(f.code)}</code></pre>
+        </summary>
+        <div style="padding:14px 18px 18px;border-top:1px solid rgba(196,181,253,.12);font-size:13px;line-height:1.6">
+          <div style="margin-bottom:10px">
+            <b class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Detailed Explanation:</b>
+            <div style="color:var(--tx);margin-top:2px">${escapeHtml(f.explanation)}</div>
           </div>
-        ` : ''}
 
-        ${f.why ? `
-          <div style="font-size:12.5px;color:var(--mut);background:rgba(139,92,246,.06);border-left:3px solid var(--v);padding:6px 10px;border-radius:0 6px 6px 0;margin-bottom:8px">
-            <b>Why this matters:</b> ${escapeHtml(f.why)}
+          <div style="margin-bottom:10px">
+            <b class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Why This Issue Matters:</b>
+            <div style="color:var(--tx);margin-top:2px">${escapeHtml(f.why)}</div>
           </div>
-        ` : ''}
 
-        ${f.fix ? `
-          <div style="margin-top:8px;background:rgba(74,222,128,.04);border:1px solid rgba(74,222,128,.15);border-radius:8px;padding:10px">
-            <div class="row sp" style="margin-bottom:4px">
-              <small style="color:var(--grn);font-weight:600">Suggested Corrective Action:</small>
-              <button type="button" class="btn ghost" onclick="copySnippet(this, '${codeId}')" style="padding:2px 8px;font-size:11px;animation:none">Copy Fix</button>
+          ${f.evidence ? `
+            <div style="margin-bottom:10px">
+              <b class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Problematic Code Snippet:</b>
+              <pre style="background:rgba(0,0,0,.6);border:1px solid rgba(248,113,113,.2);border-radius:6px;padding:8px 12px;font-size:12px;margin:4px 0;color:#fca5a5;overflow:auto"><code>${escapeHtml(f.evidence)}</code></pre>
             </div>
-            <pre style="background:rgba(0,0,0,.6);border-radius:6px;padding:8px 12px;font-size:12px;margin:0;color:#86efac;overflow:auto"><code id="${codeId}">${escapeHtml(f.fix)}</code></pre>
-          </div>
-        ` : ''}
+          ` : ''}
 
-        ${f.ref || f.reference ? `
-          <div style="margin-top:8px;font-size:12px">
-            <a href="${escapeHtml(f.ref || f.reference)}" target="_blank" rel="noopener" style="color:var(--blu);text-decoration:none">🔗 Reference Documentation ↗</a>
+          <div style="margin-bottom:8px">
+            <div class="row sp" style="margin-bottom:4px">
+              <b style="color:var(--grn);font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Suggested Corrective Action:</b>
+              ${f.fix && !f.fix.startsWith('http') && f.fix.includes('\n') ? `<button type="button" class="btn ghost" onclick="copySnippet(this, '${codeId}')" style="padding:2px 8px;font-size:11px;animation:none">Copy Fix</button>` : ''}
+            </div>
+            ${f.fix && !f.fix.startsWith('http') && f.fix.includes('\n') ? `
+              <pre style="background:rgba(0,0,0,.6);border:1px solid rgba(74,222,128,.2);border-radius:6px;padding:8px 12px;font-size:12px;margin:0;color:#86efac;overflow:auto"><code id="${codeId}">${escapeHtml(f.fix)}</code></pre>
+            ` : `<div style="color:var(--l);margin-top:2px">${escapeHtml(f.fix)}</div>`}
           </div>
-        ` : ''}
-      </div>
+
+          ${f.ref ? `
+            <div style="margin-top:10px;font-size:12px">
+              <a href="${escapeHtml(f.ref)}" target="_blank" rel="noopener" style="color:var(--blu);text-decoration:none">🔗 Reference Documentation ↗</a>
+            </div>
+          ` : ''}
+        </div>
+      </details>
     `;
   }).join(''));
 
@@ -1003,7 +1023,7 @@ function renderGithubOutput(data, scrollIntoView = true) {
         <div class="row" style="gap:10px">
           <span style="font-size:12.5px;color:var(--l);font-weight:600">Filters:</span>
           <select style="width:auto;padding:5px 10px;font-size:12px" onchange="setGhFilter('sev', this.value)" aria-label="Filter Severity">
-            <option value="ALL" ${GH_FILTERS.sev === 'ALL' ? 'selected' : ''}>Severity: All (${findings.length})</option>
+            <option value="ALL" ${GH_FILTERS.sev === 'ALL' ? 'selected' : ''}>Severity: All (${enhancedFindings.length})</option>
             <option value="Critical" ${GH_FILTERS.sev === 'Critical' ? 'selected' : ''}>Critical (${critCount})</option>
             <option value="Warning" ${GH_FILTERS.sev === 'Warning' ? 'selected' : ''}>Warning (${warnCount})</option>
             <option value="Informational" ${GH_FILTERS.sev === 'Informational' ? 'selected' : ''}>Informational (${infoCount})</option>
@@ -1138,7 +1158,7 @@ function renderGithubOutput(data, scrollIntoView = true) {
         </div>
         <div style="background:rgba(8,11,26,.6);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
           <small class="mut">Total Issues Detected</small>
-          <div style="font-size:22px;font-weight:700;color:${findings.length ? 'var(--red)' : 'var(--grn)'};margin-top:2px">${findings.length}</div>
+          <div style="font-size:22px;font-weight:700;color:${enhancedFindings.length ? 'var(--red)' : 'var(--grn)'};margin-top:2px">${enhancedFindings.length}</div>
         </div>
         <div style="background:rgba(8,11,26,.6);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
           <small class="mut">Severity Breakdown</small>
@@ -1188,7 +1208,7 @@ function renderGithubOutput(data, scrollIntoView = true) {
       <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
         <div class="row" style="gap:10px">
           <b style="font-size:15px;color:var(--tx)">3. Static Analysis Results</b>
-          <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);border-color:rgba(196,181,253,.25);color:var(--l)">${findings.length} Issue(s)</span>
+          <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);border-color:rgba(196,181,253,.25);color:var(--l)">${enhancedFindings.length} Issue(s)</span>
         </div>
         <div class="row" style="gap:10px">
           ${critCount ? '<span class="chip c-r">CRITICAL</span>' : (warnCount ? '<span class="chip c-a">WARNING</span>' : '<span class="chip c-g">PASSED</span>')}

@@ -623,8 +623,8 @@ def analyze_github_repository(
 
     # 6. Compute Defined Repository Health Score (Section 7)
     crit_count = sum(1 for f in findings if f.get("severity") in ("Critical", "High"))
-    warn_count = sum(1 for f in findings if f.get("severity") in ("Medium", "Low"))
-    info_count = sum(1 for f in findings if f.get("severity") in ("Informational", "Low"))
+    warn_count = sum(1 for f in findings if f.get("severity") in ("Medium", "Low", "Warning"))
+    info_count = sum(1 for f in findings if f.get("severity") in ("Informational", "Info"))
     avg_cc = metrics.get("avg_complexity", 1.0) or 1.0
     mi = metrics.get("maintainability_index_avg", 80.0) or 80.0
 

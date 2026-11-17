@@ -102,6 +102,19 @@ def analyze_files(files: list[SourceFile], input_type: str, input_name: str, lan
     findings += ruff_findings
     findings += sa.merge_security(builtin_security, bandit_findings)
 
+    # Deduplicate findings while preserving order and filter scanner internal errors
+    unique_findings: list[Finding] = []
+    seen = set()
+    for f in findings:
+        # Ignore tool crash errors or missing path entries from counting as code issues
+        if "error" in f.rule_id.lower() and f.source == "static_analyzer" and not f.evidence:
+            continue
+        key = (f.rule_id, f.file_path, f.line_number or 0, f.description)
+        if key not in seen:
+            seen.add(key)
+            unique_findings.append(f)
+    findings = unique_findings
+
     rad = tr.radon_status()
     rad.ran = radon_used
     if radon_msgs:
