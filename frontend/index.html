@@ -116,7 +116,7 @@ const head=(t,s)=>`<div class="ph"><h1>${t}</h1><p>${s}</p></div>`;
 const empty=t=>`<div class="empty">${t}</div>`;
 const legend=`<div class="sev"><span class="chip c-r">Critical</span><span class="chip c-a">Warning</span><span class="chip c-b">Informational</span><span class="chip c-g">Passed</span></div>`;
 const SECT=['Syntax Errors','Code Quality','Complexity Analysis','Security Issues','AI Code Review','Suggestions for Improvement'];
-const results=(secs,msg)=>`<div class="mt"><div class="row sp" style="margin-bottom:12px"><h3>Results</h3>${legend}</div>${secs.map(s=>`<details><summary>${s}</summary><div>${msg}</div></details>`).join('')}</div>`;
+const results=(secs,msg)=>`<div id="res-box" class="mt"><div class="row sp" style="margin-bottom:12px"><h3>Results</h3>${legend}</div>${secs.map(s=>`<details><summary>${s}</summary><div>${msg}</div></details>`).join('')}</div>`;
 const NOENG='Nothing to show yet. Results from your analysis engine appear here once an analysis has run.';
 function runDemo(btn,bar,label){if(btn.classList.contains('busy'))return;btn.classList.add('busy');const p=$(bar);p.style.display='block';const f=p.firstElementChild;f.style.width='0';let n=0;const iv=setInterval(()=>{n+=8+Math.random()*10;f.style.width=Math.min(n,100)+'%';if(n>=100){clearInterval(iv);btn.classList.remove('busy');setTimeout(()=>p.style.display='none',500);toast(label+': this prototype has no analysis engine connected, so no results were generated.')}},260)}
 const feats=[['code-analysis','Code Analysis','code','Upload or paste source code to perform intelligent code analysis.'],['github-review','GitHub Repository Review','git','Connect a repository and analyze its code structure and quality.'],['pdf-analysis','PDF Analysis','pdf','Upload technical specification PDFs for analysis.'],['reports','Documentation Generator','doc','Generate structured technical documentation.']];
@@ -125,20 +125,144 @@ const V={
 home:()=>`<section class="hero"><div><span class="badge">AI-Powered Developer Intelligence</span><h1>TechSpecAnalyser</h1><h2>Enter the Universe of Intelligent Code Analysis</h2><p>An AI-powered code intelligence platform that analyzes source code, detects potential issues, reviews GitHub repositories, and generates meaningful technical documentation.</p><div class="cta"><a class="btn" href="#code-analysis">Launch Code Analysis</a><a class="btn ghost" href="#features">Explore Features</a></div></div>
 <div class="pw" aria-hidden="true"><div class="rays"></div><div class="ring r1"></div><div class="ring r2"></div><div class="core"></div><div class="orbit" style="--i:4%;--t:22s"><b></b></div><div class="orbit" style="--i:12%;--t:34s;animation-direction:reverse"><b style="background:#93c5fd;box-shadow:0 0 10px #60a5fa"></b></div><div class="orbit" style="--i:0%;--t:50s"><b style="width:4px;height:4px"></b></div></div></section>
 <section class="feat" id="features"><div class="grid g4">${cards()}</div></section>`,
-dashboard:()=>head('Welcome to Your Code Universe','Explore, analyze, and improve your code with intelligent AI-powered tools.')+`<div class="grid g4">${cards()}</div><div class="card mt"><div class="row sp"><div><h3>Recent activity</h3><p>Your latest analyses will appear here.</p></div><a class="btn" href="#code-analysis">Start an analysis</a></div></div>`,
+dashboard:()=>head('Welcome to Your Code Universe','Explore, analyze, and improve your code with intelligent AI-powered tools.')+`<div id="dash-stats"></div><div class="grid g4">${cards()}</div><div class="card mt"><div class="row sp"><div><h3>Recent activity</h3><p>Your latest analyses will appear here.</p></div><a class="btn" href="#code-analysis">Start an analysis</a></div></div>`,
 'code-analysis':()=>head('Code Analysis','Paste or upload source code to review it.')+`<div class="card"><div class="row" style="margin-bottom:14px"><select id="lang" style="width:auto;min-width:170px" aria-label="Language">${['Python','JavaScript','TypeScript','Java','C','C++','C#','Go','Rust','PHP'].map(l=>`<option>${l}</option>`).join('')}</select><label class="btn ghost" style="padding:10px 18px;animation:none">Upload file<input id="cf" type="file" hidden accept=".py,.js,.ts,.java,.c,.cpp,.cs,.go,.rs,.php,.txt"></label></div><textarea id="code" placeholder="Paste your code here…" spellcheck="false" aria-label="Source code"></textarea><div class="row mt"><button class="btn" id="an"><span class="spin"></span>Analyze Code</button><span class="mut" id="fn"></span></div><div class="prog" id="pg"><i></i></div></div>`+results(SECT,NOENG),
 'github-review':()=>head('GitHub Repository Review','Analyze a repository’s structure and quality.')+`<div class="card"><div class="row"><input type="text" id="url" placeholder="https://github.com/owner/repository" style="flex:1;min-width:240px" aria-label="Repository URL"><button class="btn" id="an"><span class="spin"></span>Analyze Repository</button></div><div class="prog" id="pg"><i></i></div><div id="ri" class="mt"></div></div>`+results(['Repository Information','File Structure','Static Analysis Results','AI-Generated Review','Improvement Suggestions'],NOENG),
 'pdf-analysis':()=>head('PDF Analysis','Upload a technical specification to extract and review it.')+`<div class="card"><label class="drop" id="dz" style="display:block;cursor:pointer"><div class="ic" style="margin:0 auto 12px">${ic('pdf')}</div><b style="color:var(--tx)">Drag and drop a PDF here</b><br>or click to choose a file<input id="pf" type="file" accept="application/pdf" hidden></label><div id="pi" class="mt"></div><div class="row mt"><button class="btn" id="an"><span class="spin"></span>Analyze PDF</button></div><div class="prog" id="pg"><i></i></div></div>`+results(['Extracted Technical Specifications','AI-Generated Insights','Downloadable Reports'],NOENG),
-history:()=>head('Analysis History','Everything you have analyzed, newest first.')+`<div class="card">${empty('No analyses yet. Run one and it will be listed here.')}</div>`,
+history:()=>head('Analysis History','Everything you have analyzed, newest first.')+`<div class="card" id="history-box">${empty('No analyses yet. Run one and it will be listed here.')}</div>`,
 reports:()=>head('Generated Reports','Quality scores, findings and documentation.')+`<div class="grid g3"><div class="card"><h3>Overall quality score</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">Not calculated</p><p>Shown only after an analysis computes one.</p></div><div class="card"><h3>Issues detected</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">–</p></div><div class="card"><h3>Security findings</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">–</p></div></div><div class="card mt"><h3 style="margin-bottom:12px">Reports</h3>${empty('No reports generated yet.')}</div>`,
 'app-settings':()=>head('Settings','Preferences for this workspace.')+`<div class="card" style="max-width:640px"><div class="sw"><span>Calm mode<br><small class="mut">Turns off background drift and glow animations</small></span><input type="checkbox" id="calm" ${document.body.classList.contains('calm')?'checked':''}></div><p class="mut mt">API keys and connections are managed by your backend and are never stored in this page.</p></div>`};
-function bind(k){const an=$('#an');
- if(k=='code-analysis'){$('#cf').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('#code').value=r.result;$('#fn').textContent=f.name;toast('Loaded '+f.name)};r.readAsText(f)};an.onclick=()=>{if(!$('#code').value.trim())return toast('Add some code first.');runDemo(an,'#pg','Code Analysis')}}
- if(k=='github-review'){an.onclick=()=>{const m=$('#url').value.trim().match(/^https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/);if(!m)return toast('Enter a URL like https://github.com/owner/repository');$('#ri').innerHTML=`<span class="chip c-b">${m[1]}/${m[2]}</span>`;runDemo(an,'#pg','Repository Review')}}
- if(k=='pdf-analysis'){const dz=$('#dz'),pf=$('#pf');const show=f=>{if(!f||f.type!='application/pdf')return toast('Please choose a PDF file.');$('#pi').innerHTML=`<span class="chip c-b">${f.name.replace(/[<>&]/g,'')} · ${(f.size/1024).toFixed(0)} KB</span>`;toast('Document ready')};pf.onchange=e=>show(e.target.files[0]);['dragenter','dragover'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.add('over')}));['dragleave','drop'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.remove('over')}));dz.addEventListener('drop',e=>show(e.dataTransfer.files[0]));an.onclick=()=>{if(!$('#pi').innerHTML)return toast('Upload a PDF first.');runDemo(an,'#pg','PDF Analysis')}}
- if(k=='app-settings')$('#calm').onchange=e=>{document.body.classList.toggle('calm',e.target.checked);toast(e.target.checked?'Calm mode on':'Calm mode off')}}
+function renderAnalysisOutput(data){
+  const el=$('#res-box');if(!el)return;
+  const m=data.metrics||{};
+  const tools=(data.tools||[]).filter(t=>t.ran).map(t=>t.name+(t.version?' ('+t.version+')':'')).join(', ') || 'Built-in AST';
+  const findings=data.findings||[];
+  const crit=findings.filter(f=>f.severity==='Critical'||f.severity==='High');
+  const warn=findings.filter(f=>f.severity==='Medium'||f.severity==='Low');
+  const info=findings.filter(f=>f.severity==='Informational');
+  const chipClass=s=>s==='Critical'||s==='High'?'c-r':s==='Medium'?'c-a':s==='Low'?'c-b':'c-g';
+  const renderList=list=>list.length?list.map(f=>`
+    <div style="padding:10px 0;border-bottom:1px solid rgba(196,181,253,.1)">
+      <div class="row" style="gap:8px;margin-bottom:4px">
+        <span class="chip ${chipClass(f.severity)}">${f.severity}</span>
+        <b>${f.rule_id || f.category}</b>
+        <span class="mut" style="font-size:12px">Line ${f.line_number || '-'} · ${f.source}</span>
+      </div>
+      <div>${f.description || ''}</div>
+      ${f.evidence ? `<pre style="background:rgba(0,0,0,.3);padding:6px;border-radius:6px;margin:6px 0;font-size:12px"><code>${f.evidence}</code></pre>` : ''}
+      ${f.recommended_correction ? `<div style="color:var(--l);font-size:12px">Fix: ${f.recommended_correction}</div>` : ''}
+    </div>
+  `).join('') : '<div class="mut">No issues detected in this category.</div>';
+
+  el.innerHTML=`
+    <div class="card mt" style="background:rgba(16,22,43,.85);margin-bottom:18px">
+      <h3>Analysis Result (${data.analysis_id || 'Completed'})</h3>
+      <div class="grid g4 mt">
+        <div><small class="mut">Complexity (Radon)</small><h2 style="margin:4px 0">${m.avg_complexity ?? 'N/A'}</h2></div>
+        <div><small class="mut">Maintainability Index</small><h2 style="margin:4px 0">${m.maintainability_index_avg ?? 'N/A'}</h2></div>
+        <div><small class="mut">Total Issues</small><h2 style="margin:4px 0;color:${findings.length?'var(--red)':'var(--grn)'}">${findings.length}</h2></div>
+        <div><small class="mut">Tools Executed</small><div style="font-size:13px;color:var(--l);margin-top:4px">${tools}</div></div>
+      </div>
+    </div>
+    <div class="row sp" style="margin-bottom:12px"><h3>Detailed Findings</h3>${legend}</div>
+    <details open><summary>Security & Critical (${crit.length})</summary><div>${renderList(crit)}</div></details>
+    <details open><summary>Code Quality & Warnings (${warn.length})</summary><div>${renderList(warn)}</div></details>
+    <details><summary>Complexity & Informational (${info.length})</summary><div>${renderList(info)}</div></details>
+  `;
+}
+
+function bind(k){
+  const an=$('#an');
+  if(k=='code-analysis'){
+    $('#cf').onchange=e=>{
+      const f=e.target.files[0];if(!f)return;
+      const r=new FileReader();
+      r.onload=()=>{$('#code').value=r.result;$('#fn').textContent=f.name;toast('Loaded '+f.name)};
+      r.readAsText(f);
+    };
+    an.onclick=async ()=>{
+      const code=$('#code').value;
+      const lang=$('#lang').value.toLowerCase();
+      if(!code.trim())return toast('Add some code first.');
+      if(an.classList.contains('busy'))return;
+      an.classList.add('busy');
+      const p=$('#pg');p.style.display='block';p.firstElementChild.style.width='50%';
+      try{
+        const res=await fetch('/api/analysis/code',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({code,language:lang,filename:'snippet.'+(lang==='python'?'py':lang)})
+        });
+        p.firstElementChild.style.width='90%';
+        const data=await res.json();
+        p.firstElementChild.style.width='100%';
+        setTimeout(()=>p.style.display='none',300);
+        an.classList.remove('busy');
+        renderAnalysisOutput(data);
+        toast('Analysis completed successfully!');
+      }catch(err){
+        an.classList.remove('busy');
+        p.style.display='none';
+        toast('Analysis error: '+err.message);
+      }
+    };
+  }
+  if(k=='history'){
+    fetch('/api/history').then(r=>r.json()).then(data=>{
+      const items=data.items||[];
+      const c=$('#history-box');
+      if(!c)return;
+      if(!items.length){c.innerHTML=empty('No analyses yet. Run one and it will be listed here.');return;}
+      c.innerHTML=items.map(it=>`
+        <div style="padding:14px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:rgba(8,11,26,.6)">
+          <div class="row sp">
+            <b>${it.input_name} (${it.language})</b>
+            <span class="chip c-g">${it.status}</span>
+          </div>
+          <div class="mut" style="font-size:12px;margin-top:6px">ID: ${it.id} · ${it.created_at} · Issues: ${it.issues_total} (Critical/High: ${it.critical_count + it.high_count})</div>
+        </div>
+      `).join('');
+    }).catch(()=>{});
+  }
+  if(k=='dashboard'){
+    fetch('/api/dashboard/stats').then(r=>r.json()).then(s=>{
+      const db=$('#dash-stats');
+      if(!db)return;
+      db.innerHTML=`
+        <div class="grid g4 mt" style="margin-bottom:20px">
+          <div class="card"><h3>Total Analyses</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">${s.total_analyses}</p></div>
+          <div class="card"><h3>Completed</h3><p style="font-size:30px;color:var(--grn);margin-top:6px">${s.completed}</p></div>
+          <div class="card"><h3>Total Issues</h3><p style="font-size:30px;color:var(--red);margin-top:6px">${s.total_issues}</p></div>
+          <div class="card"><h3>Critical / High</h3><p style="font-size:30px;color:var(--amb);margin-top:6px">${s.critical_high}</p></div>
+        </div>
+      `;
+    }).catch(()=>{});
+  }
+  if(k=='github-review'){
+    an.onclick=()=>{
+      const m=$('#url').value.trim().match(/^https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/);
+      if(!m)return toast('Enter a URL like https://github.com/owner/repository');
+      $('#ri').innerHTML=`<span class="chip c-b">${m[1]}/${m[2]}</span>`;
+      runDemo(an,'#pg','Repository Review');
+    };
+  }
+  if(k=='pdf-analysis'){
+    const dz=$('#dz'),pf=$('#pf');
+    const show=f=>{
+      if(!f||f.type!='application/pdf')return toast('Please choose a PDF file.');
+      $('#pi').innerHTML=`<span class="chip c-b">${f.name.replace(/[<>&]/g,'')} · ${(f.size/1024).toFixed(0)} KB</span>`;
+      toast('Document ready');
+    };
+    pf.onchange=e=>show(e.target.files[0]);
+    ['dragenter','dragover'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.add('over')}));
+    ['dragleave','drop'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.remove('over')}));
+    dz.addEventListener('drop',e=>show(e.dataTransfer.files[0]));
+    an.onclick=()=>{if(!$('#pi').innerHTML)return toast('Upload a PDF first.');runDemo(an,'#pg','PDF Analysis');};
+  }
+  if(k=='app-settings')$('#calm').onchange=e=>{document.body.classList.toggle('calm',e.target.checked);toast(e.target.checked?'Calm mode on':'Calm mode off')};
+}
 function render(){const h=location.hash.slice(1);const k=V[h]?h:(h=='features'?'home':'home');const home=k=='home';
- $('#body').innerHTML=home?`<div class="view">${V.home()}</div>`:`<div class="wrap"><nav id="nav">${NAV.map(n=>`<a href="#${n[0]}" class="${n[0]==k?'on':''}">${ic(n[2])}${n[1]}</a>`).join('')}</nav><main><div class="view">${V[k]()}<p class="note">Prototype: no analysis engine is connected, so no results are generated or invented.</p></div></main></div>`;
+ $('#body').innerHTML=home?`<div class="view">${V.home()}</div>`:`<div class="wrap"><nav id="nav">${NAV.map(n=>`<a href="#${n[0]}" class="${n[0]==k?'on':''}">${ic(n[2])}${n[1]}</a>`).join('')}</nav><main><div class="view">${V[k]()}</div></main></div>`;
  $('#mb').style.display=home?'none':'';bind(k);if(h=='features')document.getElementById('features').scrollIntoView({behavior:'smooth'});else scrollTo(0,0)}
 addEventListener('hashchange',render);
 $('#mb').onclick=()=>{const n=$('#nav');n&&n.classList.toggle('open')};
