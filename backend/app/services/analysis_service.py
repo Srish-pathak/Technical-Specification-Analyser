@@ -131,14 +131,29 @@ def analyze_files(files: list[SourceFile], input_type: str, input_name: str, lan
         "doc_items": doc_items, "doc_documented": doc_documented,
         "documentation_coverage": round(100 * doc_documented / doc_items, 1) if doc_items else None,
     }
+    ai_result = {"available": s.ai_configured, "ran": False, "note": "AI review not configured."}
+    if s.ai_configured and s.ai_api_key:
+        try:
+            from app.services.ai_service import review_code_with_gemini
+            primary_src = files[0].content if files else ""
+            ai_result = review_code_with_gemini(
+                code=primary_src,
+                language=language,
+                findings=[x.to_dict() for x in findings],
+                metrics=metrics,
+                api_key=s.ai_api_key,
+                model=s.ai_model or "gemini-3.8-flash"
+            )
+        except Exception as e:
+            ai_result = {"available": True, "ran": False, "error": str(e), "note": f"AI review failed: {e}"}
+
     return {
         "analysis_id": "A-" + uuid.uuid4().hex[:12], "input_type": input_type, "input_name": input_name,
         "language": language, "status": "completed", "created_at": utcnow(), "completed_at": utcnow(),
         "files": file_rows, "structure": structures, "findings": [x.to_dict() for x in findings],
         "metrics": metrics, "tools": [t.to_dict() for t in tools], "limitations": limitations,
         "severity_rationale": SEVERITY_RATIONALE,
-        "ai": {"available": s.ai_configured, "ran": False,
-               "note": "AI agent review is not part of the static-analysis phase; no AI output is included in this result."},
+        "ai": ai_result,
         "error": None,
     }
 

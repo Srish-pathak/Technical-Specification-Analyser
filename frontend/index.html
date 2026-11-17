@@ -154,6 +154,40 @@ function renderAnalysisOutput(data){
     </div>
   `).join('') : '<div class="mut">No issues detected in this category.</div>';
 
+  const ai = data.ai || {};
+  let aiHtml = '';
+  if(ai.ran){
+    const suggs = (ai.suggestions||[]).map(s=>`
+      <div style="padding:10px 0;border-bottom:1px solid rgba(196,181,253,.1)">
+        <div class="row" style="gap:8px;margin-bottom:4px">
+          <span class="chip ${chipClass(s.severity)}">${s.severity || 'AI Suggestion'}</span>
+          <b>${s.title || s.category}</b>
+        </div>
+        <div>${s.description || ''}</div>
+        ${s.recommendation ? `<div style="color:var(--l);font-size:12px;margin-top:4px">💡 ${s.recommendation}</div>` : ''}
+      </div>
+    `).join('');
+
+    aiHtml = `
+      <div class="card mt" style="background:linear-gradient(135deg,rgba(139,92,246,.2),rgba(59,130,246,.15));border-color:rgba(196,181,253,.35);margin-bottom:18px">
+        <div class="row sp">
+          <h3>✨ Gemini AI Review (${ai.model || 'Gemini'})</h3>
+          <span class="chip c-b" style="font-size:13px">AI Health Score: ${ai.ai_score ?? 85}/100</span>
+        </div>
+        <p style="color:var(--tx);margin:10px 0 14px">${ai.summary || ''}</p>
+        ${suggs ? `<h4 style="margin:12px 0 6px">AI Recommendations:</h4>${suggs}` : ''}
+        ${ai.improved_code ? `<details style="margin-top:14px"><summary>Refactored & Improved Code Proposal</summary><pre style="background:rgba(0,0,0,.45);padding:12px;border-radius:8px;font-size:12px;overflow:auto"><code>${ai.improved_code.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre></details>` : ''}
+      </div>
+    `;
+  } else if (ai.error) {
+    aiHtml = `
+      <div class="card mt" style="background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3);margin-bottom:18px">
+        <h4 style="color:var(--red)">Gemini AI Review Note</h4>
+        <p style="font-size:13px;color:var(--mut)">${ai.note || ai.error}</p>
+      </div>
+    `;
+  }
+
   el.innerHTML=`
     <div class="card mt" style="background:rgba(16,22,43,.85);margin-bottom:18px">
       <h3>Analysis Result (${data.analysis_id || 'Completed'})</h3>
@@ -164,6 +198,7 @@ function renderAnalysisOutput(data){
         <div><small class="mut">Tools Executed</small><div style="font-size:13px;color:var(--l);margin-top:4px">${tools}</div></div>
       </div>
     </div>
+    ${aiHtml}
     <div class="row sp" style="margin-bottom:12px"><h3>Detailed Findings</h3>${legend}</div>
     <details open><summary>Security & Critical (${crit.length})</summary><div>${renderList(crit)}</div></details>
     <details open><summary>Code Quality & Warnings (${warn.length})</summary><div>${renderList(warn)}</div></details>

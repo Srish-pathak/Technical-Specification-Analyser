@@ -65,8 +65,8 @@ def get_settings() -> Settings:
         db_path=Path(os.environ.get("TSA_DB_PATH", str(d.db_path))),
         retention_days=_int("TSA_RETENTION_DAYS", d.retention_days),
         tool_timeout_seconds=_int("TSA_TOOL_TIMEOUT_SECONDS", d.tool_timeout_seconds),
-        ai_provider=os.environ.get("TSA_AI_PROVIDER", ""),
-        ai_model=os.environ.get("TSA_AI_MODEL", ""),
-        ai_api_key=os.environ.get("TSA_AI_API_KEY", ""),
+        ai_provider=os.environ.get("TSA_AI_PROVIDER", os.environ.get("GEMINI_API_PROVIDER", "gemini")),
+        ai_model=os.environ.get("TSA_AI_MODEL", os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")),
+        ai_api_key=os.environ.get("TSA_AI_API_KEY", os.environ.get("GEMINI_API_KEY", "")),
         ai_timeout_seconds=_int("TSA_AI_TIMEOUT_SECONDS", d.ai_timeout_seconds),
     )
