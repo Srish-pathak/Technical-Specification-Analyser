@@ -1,0 +1,11 @@
+.git
+.github
+__pycache__
+*.pyc
+.pytest_cache
+backend/data/*.db
+backend/.venv
+.venv
+*.swp
+.DS_Store
+Thumbs.db

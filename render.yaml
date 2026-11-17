@@ -4,11 +4,12 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
+    healthCheckPath: /health
     envVars:
       - key: PORT
         value: 8000
       - key: TSA_DB_PATH
-        value: data/techspecanalyser.db
+        value: /app/backend/data/techspecanalyser.db
       - key: TSA_AI_PROVIDER
         value: ""
       - key: TSA_AI_MODEL

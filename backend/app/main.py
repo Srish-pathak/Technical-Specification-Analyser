@@ -19,6 +19,11 @@ async def validation_handler(_: Request, exc: InputValidationError):
     return JSONResponse(status_code=exc.status, content={"error": {"code": exc.code, "message": exc.message}})
 
 
+@app.get("/health")
+def root_health():
+    return {"status": "ok"}
+
+
 app.include_router(system.router)
 app.include_router(analysis.router)
 app.include_router(history.router)
