@@ -10,6 +10,12 @@ class CodeAnalysisRequest(BaseModel):
     filename: Optional[str] = Field(None, max_length=120)
 
 
+class GithubAnalysisRequest(BaseModel):
+    url: str = Field(..., min_length=5, description="GitHub repository URL (e.g. https://github.com/owner/repo)")
+    branch: Optional[str] = Field(None, description="Optional branch or commit to inspect (defaults to default branch)")
+    token: Optional[str] = Field(None, description="Optional personal access token for private repositories")
+
+
 class ErrorBody(BaseModel):
     code: str
     message: str

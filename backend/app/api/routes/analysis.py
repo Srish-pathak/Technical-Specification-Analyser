@@ -5,8 +5,9 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.api.deps import get_db
 from app.core.config import get_settings
-from app.schemas.analysis import CodeAnalysisRequest
+from app.schemas.analysis import CodeAnalysisRequest, GithubAnalysisRequest
 from app.services import analysis_service as svc
+from app.services import github_service as gh_svc
 from app.services.file_manager import InputValidationError
 
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
@@ -15,6 +16,21 @@ router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 @router.post("/code")
 async def analyze_code(req: CodeAnalysisRequest):
     return await run_in_threadpool(svc.submit_code, get_db(), req.code, req.language, req.filename)
+
+
+@router.post("/github")
+async def analyze_github(req: GithubAnalysisRequest):
+    s = get_settings()
+    db = get_db()
+    result = await run_in_threadpool(
+        gh_svc.analyze_github_repository,
+        url=req.url,
+        branch=req.branch,
+        token=req.token,
+        settings=s,
+    )
+    db.save(result)
+    return result
 
 
 @router.post("/upload")
