@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: techspec-analyser
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: TSA_DB_PATH
+        value: data/techspecanalyser.db
+      - key: TSA_AI_PROVIDER
+        value: ""
+      - key: TSA_AI_MODEL
+        value: ""
+      - key: TSA_AI_API_KEY
+        value: ""
+      - key: TSA_AI_TIMEOUT_SECONDS
+        value: 60
+      - key: TSA_MAX_UPLOAD_BYTES
+        value: 1000000
+      - key: TSA_MAX_ZIP_BYTES
+        value: 20000000
+      - key: TSA_MAX_FILE_BYTES
+        value: 1000000
+      - key: TSA_MAX_EXTRACTED_FILES
+        value: 500
+      - key: TSA_MAX_EXTRACTED_BYTES
+        value: 50000000
+      - key: TSA_MAX_COMPRESSION_RATIO
+        value: 200
+      - key: TSA_TOOL_TIMEOUT_SECONDS
+        value: 60
+      - key: TSA_RETENTION_DAYS
+        value: 90
