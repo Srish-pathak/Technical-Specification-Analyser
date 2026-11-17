@@ -143,8 +143,8 @@ Return your review strictly as the JSON schema described in your instructions.""
                         return {
                             "available": True,
                             "ran": True,
-                            "model": target_model,
-                            "summary": parsed.get("summary", "Code review completed successfully."),
+                            "model": "TechSpecAnalyser Code Intelligence",
+                            "summary": parsed.get("summary", "TechSpecAnalyser Code Review completed successfully."),
                             "overall_score": score,
                             "ai_score": int(score * 10),
                             "bugs": norm_bugs,
@@ -211,20 +211,20 @@ Return your review strictly as the JSON schema described in your instructions.""
     improved_code = "# Refactored & Improved Code (Safe, Type-Annotated, Optimized)\n" + improved
 
     summary = (
-        f"Senior Engineer Review: Analyzed code structure and safety. "
+        f"TechSpecAnalyser Code Review: Analyzed code structure and safety. "
         + (f"Detected {crit_count} high-severity vulnerability (such as arbitrary code evaluation) and {warn_count} warning(s). " if crit_count else f"Code shows solid modularity with {len(findings)} standard diagnostic finding(s). ")
-        + f"Radon maintainability index is {mi}/100 with an average complexity of {avg_cc}."
+        + f"Maintainability index is {mi}/100 with an average cyclomatic complexity of {avg_cc}."
     )
 
     complexity_notes = (
         f"Time Complexity: Generally O(n) relative to input iterations. "
-        f"Space Complexity: O(1) auxiliary memory. Maintainability Index: {mi}/100 (McCabe Cyclomatic Average: {avg_cc})."
+        f"Space Complexity: O(1) auxiliary memory. Maintainability Index: {mi}/100 (Cyclomatic Average: {avg_cc})."
     )
 
     return {
         "available": True,
         "ran": True,
-        "model": "gemini-3.8-flash (grounded synthesis)",
+        "model": "TechSpecAnalyser Code Intelligence",
         "summary": summary,
         "overall_score": score,
         "ai_score": int(score * 10),
