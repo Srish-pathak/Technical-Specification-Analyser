@@ -231,54 +231,137 @@ def classify_document_domain_and_type(
 # =========================================================================
 
 def extract_pdf_pages(pdf_bytes: bytes, filename: str = "document.pdf") -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    """Extract text from a PDF while tracking page numbers and document metadata."""
+    """Extract text from a PDF while tracking page numbers and document metadata.
+
+    Supports PyMuPDF (fitz), pdfplumber, and pypdf in order of availability.
+    Validates PDF format, size, encryption, and readability.
+    """
     if not pdf_bytes or len(pdf_bytes) == 0:
         raise InputValidationError("pdf_empty", "The uploaded PDF file is empty (0 bytes).", 400)
 
-    try:
-        stream = io.BytesIO(pdf_bytes)
-        reader = pypdf.PdfReader(stream)
-    except Exception as exc:
-        logger.warning("Failed to parse PDF stream: %s", exc)
-        raise InputValidationError("pdf_invalid", f"Invalid or corrupted PDF file: {exc}", 400) from exc
+    if len(pdf_bytes) > 20 * 1024 * 1024:
+        raise InputValidationError("pdf_too_large", "The uploaded PDF exceeds the 20MB limit.", 400)
 
-    if reader.is_encrypted:
+    # Magic byte validation (%PDF-)
+    if not (pdf_bytes.startswith(b"%PDF-") or b"%PDF-" in pdf_bytes[:1024]):
         raise InputValidationError(
-            "pdf_encrypted",
-            "This PDF is password-protected or encrypted. Please upload an unprotected document.",
+            "pdf_invalid_format",
+            "Invalid file format: uploaded file does not contain a valid PDF signature (%PDF-).",
             400,
         )
-
-    num_pages = len(reader.pages)
-    if num_pages == 0:
-        raise InputValidationError("pdf_empty", "The uploaded PDF contains no pages.", 400)
 
     pages: List[Dict[str, Any]] = []
     total_chars = 0
     total_words = 0
+    num_pages = 0
+    extractor = "pypdf"
+    extracted = False
 
-    for idx, page in enumerate(reader.pages, start=1):
+    # 1. Try PyMuPDF (fitz) if installed
+    try:
+        import fitz
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        if doc.is_encrypted:
+            raise InputValidationError(
+                "pdf_encrypted",
+                "This PDF is password-protected or encrypted. Please upload an unprotected document.",
+                400,
+            )
+        num_pages = len(doc)
+        if num_pages == 0:
+            raise InputValidationError("pdf_empty", "The uploaded PDF contains no pages.", 400)
+
+        for idx, page in enumerate(doc, start=1):
+            raw_text = page.get_text("text") or ""
+            cleaned = re.sub(r"\r\n", "\n", raw_text)
+            cleaned = re.sub(r"[ \t]+", " ", cleaned).strip()
+            words = len(cleaned.split()) if cleaned else 0
+            chars = len(cleaned)
+            pages.append({
+                "page_number": idx,
+                "text": cleaned,
+                "word_count": words,
+                "char_count": chars,
+            })
+            total_chars += chars
+            total_words += words
+        extractor = "pymupdf"
+        extracted = True
+    except InputValidationError:
+        raise
+    except Exception as e:
+        logger.debug("PyMuPDF extraction not used: %s", e)
+
+    # 2. Try pdfplumber if fitz not available
+    if not extracted:
         try:
-            raw_text = page.extract_text() or ""
+            import pdfplumber
+            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+                num_pages = len(pdf.pages)
+                if num_pages == 0:
+                    raise InputValidationError("pdf_empty", "The uploaded PDF contains no pages.", 400)
+                for idx, page in enumerate(pdf.pages, start=1):
+                    raw_text = page.extract_text() or ""
+                    cleaned = re.sub(r"\r\n", "\n", raw_text)
+                    cleaned = re.sub(r"[ \t]+", " ", cleaned).strip()
+                    words = len(cleaned.split()) if cleaned else 0
+                    chars = len(cleaned)
+                    pages.append({
+                        "page_number": idx,
+                        "text": cleaned,
+                        "word_count": words,
+                        "char_count": chars,
+                    })
+                    total_chars += chars
+                    total_words += words
+                extractor = "pdfplumber"
+                extracted = True
+        except InputValidationError:
+            raise
         except Exception as e:
-            logger.warning("Error extracting text on page %d: %s", idx, e)
-            raw_text = ""
+            logger.debug("pdfplumber extraction not used: %s", e)
 
-        # Normalize line breaks and tabs
-        cleaned = re.sub(r"\r\n", "\n", raw_text)
-        cleaned = re.sub(r"[ \t]+", " ", cleaned).strip()
+    # 3. Standard fallback: pypdf
+    if not extracted:
+        try:
+            stream = io.BytesIO(pdf_bytes)
+            reader = pypdf.PdfReader(stream)
+        except Exception as exc:
+            logger.warning("Failed to parse PDF stream: %s", exc)
+            raise InputValidationError("pdf_invalid", f"Invalid or corrupted PDF file: {exc}", 400) from exc
 
-        words = len(cleaned.split()) if cleaned else 0
-        chars = len(cleaned)
+        if reader.is_encrypted:
+            raise InputValidationError(
+                "pdf_encrypted",
+                "This PDF is password-protected or encrypted. Please upload an unprotected document.",
+                400,
+            )
 
-        pages.append({
-            "page_number": idx,
-            "text": cleaned,
-            "word_count": words,
-            "char_count": chars,
-        })
-        total_chars += chars
-        total_words += words
+        num_pages = len(reader.pages)
+        if num_pages == 0:
+            raise InputValidationError("pdf_empty", "The uploaded PDF contains no pages.", 400)
+
+        for idx, page in enumerate(reader.pages, start=1):
+            try:
+                raw_text = page.extract_text() or ""
+            except Exception as e:
+                logger.warning("Error extracting text on page %d: %s", idx, e)
+                raw_text = ""
+
+            cleaned = re.sub(r"\r\n", "\n", raw_text)
+            cleaned = re.sub(r"[ \t]+", " ", cleaned).strip()
+            words = len(cleaned.split()) if cleaned else 0
+            chars = len(cleaned)
+
+            pages.append({
+                "page_number": idx,
+                "text": cleaned,
+                "word_count": words,
+                "char_count": chars,
+            })
+            total_chars += chars
+            total_words += words
+        extractor = "pypdf"
 
     has_text = total_words > 15
     meta = {
@@ -288,6 +371,7 @@ def extract_pdf_pages(pdf_bytes: bytes, filename: str = "document.pdf") -> Tuple
         "total_characters": total_chars,
         "has_text": has_text,
         "file_size_bytes": len(pdf_bytes),
+        "extractor": extractor,
     }
 
     return pages, meta
@@ -953,6 +1037,11 @@ def _generate_ai_insights(
         sec_sample = categories["security"][0]["title"]
         extracted_facts.append(f"Security Policy: Document specifies {sec_sample}.")
 
+    proj_overview = (
+        (gemini_data and gemini_data.get("project_overview"))
+        or (overview_text if len(overview_text) > 40 else f"This {doc_type_label} defines an enterprise software system spanning {meta['page_count']} page(s) and {meta['total_words']} words.")
+    )
+
     if gemini_data and gemini_data.get("executive_summary"):
         exec_summary = gemini_data["executive_summary"]
         if gemini_data.get("extracted_facts"):
@@ -1005,6 +1094,7 @@ def _generate_ai_insights(
     return {
         "model": ai_engine,
         "executive_summary": exec_summary,
+        "project_overview": proj_overview,
         "extracted_facts": extracted_facts,
         "key_observations": extracted_facts,
         "ai_architecture_evaluation": arch_eval,
@@ -1206,6 +1296,26 @@ def process_and_analyze_pdf(
         "completed_at": completed_at,
         "document_metadata": meta,
         "quality_score": quality,
+        # Direct user specification sections
+        "executive_summary": ai_insights["executive_summary"],
+        "project_overview": ai_insights.get("project_overview") or "Software engineering technical specification.",
+        "functional_requirements": categories.get("functional_requirements", []),
+        "non_functional_requirements": categories.get("non_functional_requirements", []),
+        "technical_architecture": {
+            "evaluation": ai_insights["ai_architecture_evaluation"],
+            "blocks": categories.get("architecture", []),
+            "modules": categories.get("modules", []),
+        },
+        "technology_stack": categories.get("tech_stack", []),
+        "security_requirements": {
+            "evaluation": ai_insights["security_assessment"],
+            "specifications": categories.get("security", []),
+        },
+        "potential_risks_and_issues": findings,
+        "missing_or_ambiguous_requirements": gaps,
+        "recommendations": ai_insights.get("recommendations", []),
+        "conclusion": ai_insights["conclusion"],
+        # Complete structured data models
         "extracted_specifications": categories,
         "traceability_matrix": traceability,
         "findings": findings,
@@ -1393,72 +1503,139 @@ def generate_analysis_report_pdf(data: Dict[str, Any]) -> bytes:
 
     # Section 1: Executive Summary
     ai = data.get("ai_insights", {})
-    story.append(Paragraph("1. Executive Summary & Document Scope", h1_style))
-    story.append(Paragraph(ai.get("executive_summary", "Technical audit completed successfully."), body_style))
-
-    # Section 2: Extracted Technical Specifications Table
-    story.append(Paragraph("2. Extracted Technical Specifications (Domain Coverage)", h1_style))
     specs = data.get("extracted_specifications", {})
-    spec_rows = [
-        [Paragraph("<b>Technical Domain</b>", cell_bold), Paragraph("<b>Blocks</b>", cell_bold), Paragraph("<b>Source Page(s)</b>", cell_bold), Paragraph("<b>Summary Sample</b>", cell_bold)]
-    ]
-    for domain, items in specs.items():
-        if items:
-            pages_list = sorted(list(set(str(it.get("page", 1)) for it in items)))
-            pages_str = ", ".join(f"p.{p}" for p in pages_list[:4])
-            sample = items[0].get("title", "")
-            spec_rows.append([
-                Paragraph(domain.replace("_", " ").title(), cell_bold),
-                Paragraph(str(len(items)), cell_style),
-                Paragraph(pages_str, cell_style),
-                Paragraph(sample[:90], cell_style),
-            ])
-    if len(spec_rows) > 1:
-        spt = Table(spec_rows, colWidths=[120, 45, 80, 287])
-        spt.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
-            ("PADDING", (0, 0), (-1, -1), 4),
-        ]))
-        story.append(spt)
-    story.append(Spacer(1, 6))
+    story.append(Paragraph("1. Executive Summary", h1_style))
+    story.append(Paragraph(data.get("executive_summary") or ai.get("executive_summary", "Technical audit completed successfully."), body_style))
 
-    # Section 3: Functional & Non-Functional Requirements
-    story.append(Paragraph("3. Functional & Non-Functional Requirements Breakdown", h1_style))
+    # Section 2: Project Overview
+    story.append(Paragraph("2. Project Overview & Scope", h1_style))
+    proj_ov = data.get("project_overview") or ai.get("project_overview", "")
+    story.append(Paragraph(proj_ov, body_style))
+
+    # Section 3: Functional Requirements
+    story.append(Paragraph("3. Functional Requirements", h1_style))
     fr_list = specs.get("functional_requirements", [])
-    nfr_list = specs.get("non_functional_requirements", [])
-    req_rows = [
-        [Paragraph("<b>Req Type</b>", cell_bold), Paragraph("<b>Specification / Description</b>", cell_bold), Paragraph("<b>Page</b>", cell_bold)]
-    ]
-    for fr in fr_list[:6]:
-        req_rows.append([Paragraph("Functional", cell_bold), Paragraph(fr["text"][:140], cell_style), Paragraph(f"Page {fr['page']}", cell_style)])
-    for nfr in nfr_list[:4]:
-        req_rows.append([Paragraph("Non-Functional", cell_bold), Paragraph(nfr["text"][:140], cell_style), Paragraph(f"Page {nfr['page']}", cell_style)])
-    if len(req_rows) > 1:
-        req_table = Table(req_rows, colWidths=[90, 372, 70])
-        req_table.setStyle(TableStyle([
+    if fr_list:
+        fr_rows = [
+            [Paragraph("<b>Req ID / Title</b>", cell_bold), Paragraph("<b>Functional Specification</b>", cell_bold), Paragraph("<b>Page</b>", cell_bold)]
+        ]
+        for idx, fr in enumerate(fr_list[:8], start=1):
+            fr_rows.append([
+                Paragraph(f"<b>FR-{idx:03d}</b><br/>{fr.get('title', '')[:40]}", cell_style),
+                Paragraph(fr.get("text", "")[:150], cell_style),
+                Paragraph(f"Page {fr.get('page', 1)}", cell_style),
+            ])
+        fr_table = Table(fr_rows, colWidths=[100, 362, 70])
+        fr_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
             ("PADDING", (0, 0), (-1, -1), 4),
         ]))
-        story.append(req_table)
+        story.append(fr_table)
+    else:
+        story.append(Paragraph("No functional requirement items isolated.", body_style))
     story.append(Spacer(1, 6))
 
-    # Section 4: Architecture & Technology Analysis
-    story.append(Paragraph("4. Architecture & Technology Stack Analysis", h1_style))
+    # Section 4: Non-Functional Requirements
+    story.append(Paragraph("4. Non-Functional Requirements & Quality Attributes", h1_style))
+    nfr_list = specs.get("non_functional_requirements", [])
+    if nfr_list:
+        nfr_rows = [
+            [Paragraph("<b>Req ID / Title</b>", cell_bold), Paragraph("<b>Quality Attribute / SLA</b>", cell_bold), Paragraph("<b>Page</b>", cell_bold)]
+        ]
+        for idx, nfr in enumerate(nfr_list[:6], start=1):
+            nfr_rows.append([
+                Paragraph(f"<b>NFR-{idx:03d}</b><br/>{nfr.get('title', '')[:40]}", cell_style),
+                Paragraph(nfr.get("text", "")[:150], cell_style),
+                Paragraph(f"Page {nfr.get('page', 1)}", cell_style),
+            ])
+        nfr_table = Table(nfr_rows, colWidths=[100, 362, 70])
+        nfr_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("PADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(nfr_table)
+    else:
+        story.append(Paragraph("No non-functional SLAs isolated.", body_style))
+    story.append(Spacer(1, 6))
+
+    # Section 5: Technical Architecture
+    story.append(Paragraph("5. Technical Architecture & Modularity", h1_style))
     story.append(Paragraph(f"<b>Architectural Appraisal:</b> {ai.get('ai_architecture_evaluation', 'Architecture demonstrates modular decomposition.')}", body_style))
-    if specs.get("tech_stack"):
-        tech_text = " | ".join(t.get("title", "") for t in specs["tech_stack"][:4])
-        story.append(Paragraph(f"<b>Identified Frameworks & Infrastructure:</b> {tech_text}", body_style))
+    arch_items = specs.get("architecture", []) + specs.get("modules", [])
+    if arch_items:
+        arch_rows = [
+            [Paragraph("<b>Component / Module</b>", cell_bold), Paragraph("<b>Architectural Responsibility</b>", cell_bold), Paragraph("<b>Page</b>", cell_bold)]
+        ]
+        for a in arch_items[:6]:
+            arch_rows.append([
+                Paragraph(a.get("title", "")[:45], cell_bold),
+                Paragraph(a.get("text", "")[:150], cell_style),
+                Paragraph(f"Page {a.get('page', 1)}", cell_style),
+            ])
+        at = Table(arch_rows, colWidths=[130, 332, 70])
+        at.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("PADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(at)
     story.append(Spacer(1, 6))
 
-    # Section 5: Security & Risk Assessment
-    story.append(Paragraph("5. Security & Risk Assessment", h1_style))
+    # Section 6: Technology Stack
+    story.append(Paragraph("6. Technology Stack & Integrations", h1_style))
+    tech_items = specs.get("tech_stack", []) + specs.get("api_integrations", [])
+    if tech_items:
+        tech_rows = [
+            [Paragraph("<b>Framework / Technology</b>", cell_bold), Paragraph("<b>Role & Integration Usage</b>", cell_bold), Paragraph("<b>Page</b>", cell_bold)]
+        ]
+        for t in tech_items[:6]:
+            tech_rows.append([
+                Paragraph(t.get("title", "")[:45], cell_bold),
+                Paragraph(t.get("text", "")[:150], cell_style),
+                Paragraph(f"Page {t.get('page', 1)}", cell_style),
+            ])
+        tt = Table(tech_rows, colWidths=[130, 332, 70])
+        tt.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("PADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(tt)
+    else:
+        story.append(Paragraph("Technology stack not explicitly enumerated in extracted specifications.", body_style))
+    story.append(Spacer(1, 6))
+
+    # Section 7: Security Requirements
+    story.append(Paragraph("7. Security Requirements & Threat Assessment", h1_style))
     story.append(Paragraph(f"<b>Security Profile:</b> {ai.get('security_assessment', 'Security specifications analyzed.')}", body_style))
+    sec_items = specs.get("security", [])
+    if sec_items:
+        sec_rows = [
+            [Paragraph("<b>Security Control / Policy</b>", cell_bold), Paragraph("<b>Specification Detail</b>", cell_bold), Paragraph("<b>Page</b>", cell_bold)]
+        ]
+        for s in sec_items[:5]:
+            sec_rows.append([
+                Paragraph(s.get("title", "")[:45], cell_bold),
+                Paragraph(s.get("text", "")[:150], cell_style),
+                Paragraph(f"Page {s.get('page', 1)}", cell_style),
+            ])
+        st_sec = Table(sec_rows, colWidths=[130, 332, 70])
+        st_sec.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("PADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(st_sec)
+    story.append(Spacer(1, 6))
+
+    # Section 8: Potential Risks and Issues
+    story.append(Paragraph("8. Potential Risks and Issues", h1_style))
     findings = data.get("findings", [])
     if findings:
         f_rows = [
-            [Paragraph("<b>Severity</b>", cell_bold), Paragraph("<b>Issue / Finding Title</b>", cell_bold), Paragraph("<b>Page</b>", cell_bold), Paragraph("<b>Actionable Guidance</b>", cell_bold)]
+            [Paragraph("<b>Severity</b>", cell_bold), Paragraph("<b>Identified Risk / Issue</b>", cell_bold), Paragraph("<b>Page</b>", cell_bold), Paragraph("<b>Actionable Guidance</b>", cell_bold)]
         ]
         for f in findings[:8]:
             sev = f.get("severity", "Info")
@@ -1478,10 +1655,10 @@ def generate_analysis_report_pdf(data: Dict[str, Any]) -> bytes:
         story.append(ft)
     story.append(Spacer(1, 6))
 
-    # Section 6: Missing Requirements & Gap Analysis
+    # Section 9: Missing or Ambiguous Requirements
     gaps = data.get("missing_gaps", [])
     if gaps:
-        story.append(Paragraph("6. Missing Requirements & Gap Analysis", h1_style))
+        story.append(Paragraph("9. Missing or Ambiguous Requirements (Gap Analysis)", h1_style))
         gap_rows = [
             [Paragraph("<b>Identified Gap</b>", cell_bold), Paragraph("<b>Severity</b>", cell_bold), Paragraph("<b>Suggested Engineering Improvement</b>", cell_bold)]
         ]

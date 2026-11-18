@@ -138,8 +138,6 @@ const empty=t=>`<div class="empty">${t}</div>`;
 const legend=`<div class="sev"><span class="chip c-r">Critical</span><span class="chip c-a">Warning</span><span class="chip c-b">Informational</span><span class="chip c-g">Passed</span></div>`;
 const SECT=['Syntax Errors','Code Quality','Complexity Analysis','Security Issues','AI Code Review','Suggestions for Improvement'];
 const results=(secs,msg)=>`<div id="res-box" class="mt"><div class="row sp" style="margin-bottom:12px"><h3>Results</h3>${legend}</div>${secs.map(s=>`<details><summary>${s}</summary><div>${msg}</div></details>`).join('')}</div>`;
-const NOENG='Nothing to show yet. Results from your analysis engine appear here once an analysis has run.';
-function runDemo(btn,bar,label){if(btn.classList.contains('busy'))return;btn.classList.add('busy');const p=$(bar);p.style.display='block';const f=p.firstElementChild;f.style.width='0';let n=0;const iv=setInterval(()=>{n+=8+Math.random()*10;f.style.width=Math.min(n,100)+'%';if(n>=100){clearInterval(iv);btn.classList.remove('busy');setTimeout(()=>p.style.display='none',500);toast(label+': this prototype has no analysis engine connected, so no results were generated.')}},260)}
 const feats=[['code-analysis','Code Analysis','code','Upload or paste source code to perform intelligent code analysis.'],['github-review','GitHub Repository Review','git','Connect a repository and analyze its code structure and quality.'],['pdf-analysis','PDF Analysis','pdf','Upload technical specification PDFs for analysis.'],['reports','Documentation Generator','doc','Generate structured technical documentation.']];
 const cards=()=>feats.map(f=>`<a class="card" href="#${f[0]}"><div class="ic">${ic(f[2])}</div><h3>${f[1]}</h3><p>${f[3]}</p></a>`).join('');
 const V={

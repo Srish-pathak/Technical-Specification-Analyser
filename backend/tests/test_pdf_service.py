@@ -157,6 +157,65 @@ class TestPdfService(unittest.TestCase):
         self.assertGreater(len(report_bytes), 2000)
         self.assertTrue(report_bytes.startswith(b"%PDF"))
 
+    def test_10_required_report_sections_present(self):
+        """Verify that all 10 required report sections are explicitly populated."""
+        sample_bytes = pdf_service.generate_sample_pdf_bytes()
+        result = pdf_service.process_and_analyze_pdf(sample_bytes, "Enterprise_Spec.pdf")
+
+        # 1. Executive Summary
+        self.assertIn("executive_summary", result)
+        self.assertIsInstance(result["executive_summary"], str)
+        self.assertGreater(len(result["executive_summary"]), 20)
+
+        # 2. Project Overview
+        self.assertIn("project_overview", result)
+        self.assertIsInstance(result["project_overview"], str)
+        self.assertGreater(len(result["project_overview"]), 10)
+
+        # 3. Functional Requirements
+        self.assertIn("functional_requirements", result)
+        self.assertIsInstance(result["functional_requirements"], list)
+
+        # 4. Non-Functional Requirements
+        self.assertIn("non_functional_requirements", result)
+        self.assertIsInstance(result["non_functional_requirements"], list)
+
+        # 5. Technical Architecture
+        self.assertIn("technical_architecture", result)
+        self.assertIsInstance(result["technical_architecture"], dict)
+        self.assertIn("evaluation", result["technical_architecture"])
+
+        # 6. Technology Stack
+        self.assertIn("technology_stack", result)
+        self.assertIsInstance(result["technology_stack"], list)
+
+        # 7. Security Requirements
+        self.assertIn("security_requirements", result)
+        self.assertIsInstance(result["security_requirements"], dict)
+
+        # 8. Potential Risks and Issues
+        self.assertIn("potential_risks_and_issues", result)
+        self.assertIsInstance(result["potential_risks_and_issues"], list)
+
+        # 9. Missing or Ambiguous Requirements
+        self.assertIn("missing_or_ambiguous_requirements", result)
+        self.assertIsInstance(result["missing_or_ambiguous_requirements"], list)
+
+        # 10. Recommendations
+        self.assertIn("recommendations", result)
+        self.assertIsInstance(result["recommendations"], list)
+        self.assertGreater(len(result["recommendations"]), 0)
+
+    def test_pdf_validation_invalid_signature_and_empty(self):
+        """Verify that files without valid PDF signature or empty files are rejected with 400."""
+        with self.assertRaises(InputValidationError) as cm_empty:
+            pdf_service.extract_pdf_pages(b"", "empty.pdf")
+        self.assertEqual(cm_empty.exception.code, "pdf_empty")
+
+        with self.assertRaises(InputValidationError) as cm_invalid:
+            pdf_service.extract_pdf_pages(b"NOT A REAL PDF FILE CONTENTS", "not_pdf.pdf")
+        self.assertEqual(cm_invalid.exception.code, "pdf_invalid_format")
+
 
 if __name__ == "__main__":
     unittest.main()

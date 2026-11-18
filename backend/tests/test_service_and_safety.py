@@ -117,6 +117,14 @@ class FakeToolTests(unittest.TestCase):
         p = Path(self.bin) / name
         p.write_text("#!/bin/sh\n" + body)
         p.chmod(p.stat().st_mode | stat.S_IEXEC)
+        if os.name == "nt":
+            cmd_p = Path(self.bin) / f"{name}.cmd"
+            if 'echo "ruff 0.0-fake"' in body:
+                cmd_p.write_text('@echo off\nif "%1"=="--version" (echo ruff 0.0-fake & exit /b 0)\necho [{"code":"F401","message":"unused","filename":"f0.py","location":{"row":1,"column":8}}]\nexit /b 1\n')
+            elif 'sleep 5' in body:
+                cmd_p.write_text('@echo off\nif "%1"=="--version" (echo fake & exit /b 0)\npython -c "import time; time.sleep(5)"\n')
+            elif '<html>' in body:
+                cmd_p.write_text('@echo off\nif "%1"=="--version" (echo fake & exit /b 0)\necho ^<html^>not json\n')
 
     def test_fake_ruff_findings_mapped_back_to_original_paths(self):
         self.fake("ruff", 'if [ "$1" = "--version" ]; then echo "ruff 0.0-fake"; exit 0; fi\n'
