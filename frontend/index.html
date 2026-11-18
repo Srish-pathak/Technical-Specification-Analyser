@@ -1537,8 +1537,8 @@ if(k=='github-review'){
 
       const timer1=setTimeout(()=>updateProgress(35, 'Fetching repository metadata & file structure...'), 800);
       const timer2=setTimeout(()=>updateProgress(60, 'Downloading source files in memory for analysis...'), 2200);
-      const timer3=setTimeout(()=>updateProgress(80, 'Running Bandit, Ruff, and Radon analyzers...'), 4200);
-      const timer4=setTimeout(()=>updateProgress(90, 'Generating Gemini AI architecture review...'), 6500);
+      const timer3=setTimeout(()=>updateProgress(80, 'Running static code analyzers...'), 4200);
+      const timer4=setTimeout(()=>updateProgress(90, 'Synthesizing architecture intelligence & review...'), 6500);
 
       try{
         const res=await fetch('/api/analysis/github', {
@@ -1558,7 +1558,8 @@ if(k=='github-review'){
 
         if(!res.ok){
           const errData=await res.json().catch(()=>({detail:'HTTP error '+res.status}));
-          throw new Error(errData.detail || ('GitHub Analysis failed (HTTP ' + res.status + ')'));
+          const errMsg = (errData.error && errData.error.message) ? errData.error.message : (errData.detail || errData.message || ('GitHub Analysis failed (HTTP ' + res.status + ')'));
+          throw new Error(errMsg);
         }
 
         updateProgress(100, 'Analysis finalized successfully!');
