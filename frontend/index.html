@@ -218,6 +218,7 @@ def calculate_score(user_query):
   <div class="row mt sp" style="align-items:center;flex-wrap:wrap;gap:10px">
     <div class="row" style="gap:10px;flex-wrap:wrap">
       <button type="button" class="btn ghost" id="pdf-sample-btn" style="padding:10px 18px;animation:none">⚡ Sample Tech Spec</button>
+      <a href="/api/analysis/pdf/sample/download" download="TechSpecAnalyser_Sample_Specification.pdf" class="btn ghost" id="pdf-download-btn" style="padding:10px 18px;animation:none;text-decoration:none;display:inline-flex;align-items:center;gap:6px">📥 Download Sample PDF</a>
       <button class="btn" id="an"><span class="spin"></span>Analyze PDF</button>
     </div>
     <span class="mut" id="pdf-hint" style="font-size:12.5px">Select or drop a PDF document to begin analysis</span>

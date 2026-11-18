@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
 from app.api.deps import get_db
@@ -80,6 +80,18 @@ async def analyze_sample_pdf():
     )
     db.save(result)
     return result
+
+
+@router.get("/pdf/sample/download")
+def download_sample_pdf():
+    pdf_bytes = pdf_svc.generate_sample_pdf_bytes()
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'attachment; filename="TechSpecAnalyser_Sample_Specification.pdf"'
+        },
+    )
 
 
 @router.get("/{analysis_id}")

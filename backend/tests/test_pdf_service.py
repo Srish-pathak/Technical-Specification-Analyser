@@ -113,6 +113,14 @@ class TestPdfService(unittest.TestCase):
         hist = self.db.list()
         self.assertTrue(any(item["id"] == result["analysis_id"] for item in hist))
 
+    def test_sample_pdf_download_response(self):
+        from app.api.routes.analysis import download_sample_pdf
+        resp = download_sample_pdf()
+        self.assertEqual(resp.media_type, "application/pdf")
+        self.assertIn("TechSpecAnalyser_Sample_Specification.pdf", resp.headers.get("content-disposition", ""))
+        self.assertGreater(len(resp.body), 1000)
+        self.assertTrue(resp.body.startswith(b"%PDF"))
+
 
 if __name__ == "__main__":
     unittest.main()
