@@ -49,6 +49,16 @@ RULE_TITLES = {
     "TSA-CPX-001": "Excessive Cyclomatic Complexity",
     "TSA-SYN-001": "Python Syntax Error",
     "TSA-SEC-001": "Arbitrary Code Execution via eval() or exec()",
+    "eslint:no-eval": "Arbitrary Code Execution via eval()",
+    "eslint:no-implied-eval": "Implied eval via String in Timer Function",
+    "eslint:no-unsafe-innerhtml": "Direct innerHTML Assignment (XSS Risk)",
+    "eslint:no-debugger": "Unexpected 'debugger' Statement",
+    "eslint:no-alert": "Synchronous UI Dialog (alert/confirm/prompt)",
+    "eslint:eqeqeq": "Loose Equality Comparison (eqeqeq)",
+    "eslint:no-var": "Unexpected 'var' Declaration",
+    "eslint:no-console": "Unexpected Console Statement in Production Code",
+    "eslint:complexity": "Function has Excessive Cyclomatic Complexity",
+    "eslint:syntax-error": "JavaScript Syntax Parsing Error",
 }
 
 WHY_BY_CATEGORY = {
@@ -103,6 +113,9 @@ class Finding:
             elif self.rule_id.startswith("ruff:"):
                 code = self.rule_id.split(":")[-1].lower()
                 self.reference = f"https://docs.astral.sh/ruff/rules/{code}/"
+            elif self.rule_id.startswith("eslint:"):
+                code = self.rule_id.split(":")[-1].lower()
+                self.reference = f"https://eslint.org/docs/latest/rules/{code}"
             elif "cpx" in self.rule_id.lower() or "complexity" in self.category.lower():
                 self.reference = "https://radon.readthedocs.io/en/latest/intro.html#cyclomatic-complexity"
 

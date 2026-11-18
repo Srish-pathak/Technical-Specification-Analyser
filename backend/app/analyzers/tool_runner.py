@@ -69,3 +69,17 @@ def run_tool(args: list[str], cwd: Path, timeout: int) -> tuple[int, str, str]:
     except subprocess.TimeoutExpired:
         raise ToolTimeout(f"{args[0]} timed out after {timeout}s")
     return r.returncode, r.stdout, r.stderr
+
+
+def check_node_syntax(source: str, filename: str) -> Optional[tuple[int, str, str]]:
+    """Run `node --check` in a temp dir via run_tool without directly invoking subprocess."""
+    node_bin = find_tool("node")
+    if not node_bin:
+        return None
+    with tempfile.TemporaryDirectory(prefix="tsa_node_") as tmp:
+        p = Path(tmp) / filename
+        p.write_text(source, encoding="utf-8")
+        try:
+            return run_tool([node_bin, "--check", str(p)], Path(tmp), timeout=5)
+        except Exception:
+            return None

@@ -15,6 +15,7 @@ from app.analyzers import security_analyzer as sa
 from app.analyzers import tool_runner as tr
 from app.analyzers.ast_analyzer import extract_structure
 from app.analyzers.complexity_analyzer import analyze_complexity
+from app.analyzers.js_analyzer import analyze_javascript_file
 from app.analyzers.syntax_analyzer import parse_python
 from app.core.config import Settings, get_settings
 from app.models.database import Database, utcnow
@@ -31,16 +32,23 @@ def analyze_files(files: list[SourceFile], input_type: str, input_name: str, lan
     limitations: list[str] = []
     file_rows, structures = [], {}
     parsed: list[tuple[SourceFile, ast.Module]] = []
+    analyzable_langs = ANALYZABLE_LANGUAGES if input_type != "github" else frozenset({"python", "javascript", "typescript"})
+    python_files = [f for f in files if f.kind == "source" and f.language == "python"]
+    js_files = [f for f in files if f.kind == "source" and f.language in ("javascript", "typescript")] if input_type == "github" else []
+    analyzed_js_count = 0
 
-    # Pass 1: syntax. Files that fail to parse get a finding and skip deeper analysis.
+    cc_sum = fn_count = max_cc = 0
+    mis: list[float] = []
+
+    # Pass 1: syntax & file analysis
     for f in files:
         row = {"path": f.path, "language": f.language, "kind": f.kind, "lines": f.line_count, "analyzed": False, "note": ""}
         file_rows.append(row)
         if f.kind != "source":
             row["note"] = "Support file (documentation/config); not code-analysed."
-        elif f.language not in ANALYZABLE_LANGUAGES:
+        elif f.language not in analyzable_langs:
             row["note"] = f"No deterministic analyzer for {f.language}; inventoried only."
-        else:
+        elif f.language == "python":
             tree, err = parse_python(f.content, f.path)
             if err:
                 findings.append(err)
@@ -48,36 +56,54 @@ def analyze_files(files: list[SourceFile], input_type: str, input_name: str, lan
             else:
                 parsed.append((f, tree))
                 row["analyzed"] = True
-    unsupported = sorted({f.language for f in files if f.kind == "source" and f.language not in ANALYZABLE_LANGUAGES})
-    if unsupported:
-        limitations.append("Deterministic analysis is implemented for Python only; these languages were inventoried "
-                           f"but not analysed: {', '.join(unsupported)}.")
-    if not parsed:
-        limitations.append("No parsable Python source was found, so no AST, complexity, quality or security analysis ran.")
+        elif f.language in ("javascript", "typescript") and input_type == "github":
+            js_findings, js_metric = analyze_javascript_file(f.content, f.path)
+            findings.extend(js_findings)
+            fn_count += js_metric.get("functions", 1)
+            cc_sum += js_metric.get("complexity_sum", 0)
+            max_cc = max(max_cc, js_metric.get("max_complexity", 1))
+            if js_metric.get("maintainability_index") is not None:
+                mis.append(js_metric["maintainability_index"])
+            row["analyzed"] = True
+            analyzed_js_count += 1
 
-    # External tools (static only), over parsable files.
-    pairs = [(f.path, f.content) for f, _ in parsed]
+    unsupported = sorted({f.language for f in files if f.kind == "source" and f.language not in analyzable_langs})
+    if unsupported:
+        if input_type != "github":
+            limitations.append("Deterministic analysis is implemented for Python only; these languages were inventoried "
+                               f"but not analysed: {', '.join(unsupported)}.")
+        else:
+            limitations.append(f"Deterministic analysis not available for: {', '.join(unsupported)}; inventoried only.")
+    if python_files and not parsed:
+        limitations.append("No parsable Python source was found, so no AST, complexity, quality or security analysis ran.")
+    elif not parsed and not analyzed_js_count:
+        limitations.append("No analyzable Python or JavaScript/TypeScript source was found.")
+
+    # External tools for Python
     tools: list[ToolStatus] = []
     ruff_findings: list[Finding] = []
     bandit_findings: list[Finding] = []
-    if use_external_tools and pairs:
-        ruff_findings, rs = qa.run_ruff(pairs, s.tool_timeout_seconds)
-        bandit_findings, bs = sa.run_bandit(pairs, s.tool_timeout_seconds)
-    else:
-        rs, _ = tr.cli_status("ruff")
-        bs, _ = tr.cli_status("bandit")
-        if not use_external_tools:
-            rs.note = bs.note = "External tools disabled for this run."
-    tools += [rs, bs]
-    if not rs.ran:
-        limitations.append("Ruff did not run (" + (rs.note or "unavailable") + "); built-in AST quality rules were used as the fallback.")
-    if not bs.ran:
-        limitations.append("Bandit did not run (" + (bs.note or "unavailable") + "); only built-in security rules were applied.")
+    rs_ran = False
 
-    # Pass 2: per-file analysis.
+    if python_files:
+        pairs = [(f.path, f.content) for f, _ in parsed]
+        if use_external_tools and pairs:
+            ruff_findings, rs = qa.run_ruff(pairs, s.tool_timeout_seconds)
+            bandit_findings, bs = sa.run_bandit(pairs, s.tool_timeout_seconds)
+            rs_ran = rs.ran
+        else:
+            rs, _ = tr.cli_status("ruff")
+            bs, _ = tr.cli_status("bandit")
+            if not use_external_tools:
+                rs.note = bs.note = "External tools disabled for this run."
+        tools += [rs, bs]
+        if not rs.ran and pairs:
+            limitations.append("Ruff did not run (" + (rs.note or "unavailable") + "); built-in AST quality rules were used as the fallback.")
+        if not bs.ran and pairs:
+            limitations.append("Bandit did not run (" + (bs.note or "unavailable") + "); only built-in security rules were applied.")
+
+    # Pass 2: Python per-file AST & complexity analysis
     radon_used, radon_msgs = False, set()
-    cc_sum = fn_count = max_cc = 0
-    mis: list[float] = []
     doc_items = doc_documented = 0
     builtin_security: list[Finding] = []
     for f, tree in parsed:
@@ -92,7 +118,7 @@ def analyze_files(files: list[SourceFile], input_type: str, input_name: str, lan
         max_cc = max(max_cc, cm["max_complexity"])
         if cm["maintainability_index"] is not None:
             mis.append(cm["maintainability_index"])
-        if not rs.ran:
+        if not rs_ran:
             findings += qa.builtin_quality(tree, f.content, f.path)
         builtin_security += sa.builtin_security(tree, f.content, st)
         structures[f.path] = st.to_dict()
@@ -102,11 +128,27 @@ def analyze_files(files: list[SourceFile], input_type: str, input_name: str, lan
     findings += ruff_findings
     findings += sa.merge_security(builtin_security, bandit_findings)
 
+    # Add tool statuses
+    if python_files:
+        rad = tr.radon_status()
+        rad.ran = radon_used
+        if radon_msgs:
+            rad.note = "; ".join(sorted(radon_msgs))
+        tools.insert(0, rad)
+        if not radon_used and parsed:
+            limitations.append("Radon was not used; complexity came from the built-in McCabe counter and the maintainability index was not computed.")
+        tools.append(ToolStatus("builtin-ast", True, True, "", "Built-in deterministic AST rules (quality + security)."))
+
+    if js_files:
+        tools.append(ToolStatus("eslint-rules", True, True, "Recommended", "Deterministic JavaScript / TypeScript static analyzer."))
+        node_path = tr.find_tool("node")
+        if node_path:
+            tools.append(ToolStatus("node-syntax", True, True, tr.tool_version(node_path), "Node.js syntax validator (node --check)."))
+
     # Deduplicate findings while preserving order and filter scanner internal errors
     unique_findings: list[Finding] = []
     seen = set()
     for f in findings:
-        # Ignore tool crash errors or missing path entries from counting as code issues
         if "error" in f.rule_id.lower() and f.source == "static_analyzer" and not f.evidence:
             continue
         key = (f.rule_id, f.file_path, f.line_number or 0, f.description)
@@ -114,16 +156,6 @@ def analyze_files(files: list[SourceFile], input_type: str, input_name: str, lan
             seen.add(key)
             unique_findings.append(f)
     findings = unique_findings
-
-    rad = tr.radon_status()
-    rad.ran = radon_used
-    if radon_msgs:
-        rad.note = "; ".join(sorted(radon_msgs))
-    tools.insert(0, rad)
-    if not radon_used:
-        limitations.append("Radon was not used; complexity came from the built-in McCabe counter and the "
-                           "maintainability index was not computed.")
-    tools.append(ToolStatus("builtin-ast", True, True, "", "Built-in deterministic AST rules (quality + security)."))
 
     order = {sv: i for i, sv in enumerate(SEVERITY_ORDER)}
     findings.sort(key=lambda x: (order.get(x.severity, 9), x.file_path, x.line_number or 0, x.rule_id))
@@ -135,7 +167,7 @@ def analyze_files(files: list[SourceFile], input_type: str, input_name: str, lan
         by_category[x.category] = by_category.get(x.category, 0) + 1
 
     metrics = {
-        "files_total": len(files), "files_analyzed": len(parsed),
+        "files_total": len(files), "files_analyzed": len(parsed) + analyzed_js_count,
         "total_lines": sum(f.line_count for f in files),
         "total_findings": len(findings), "severity_counts": sev, "by_source": by_source, "by_category": by_category,
         "function_count": fn_count, "class_count": sum(len(st["classes"]) for st in structures.values()),

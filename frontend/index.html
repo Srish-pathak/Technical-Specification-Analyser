@@ -253,6 +253,78 @@ const RULE_DB = {
     fix: 'Refactor complex conditional branches into smaller helper functions or lookup tables.',
     code: '',
     ref: 'https://radon.readthedocs.io/en/latest/intro.html#cyclomatic-complexity'
+  },
+  'eslint:no-eval': {
+    title: 'Arbitrary Code Execution via eval().',
+    explanation: 'eval() passes unsanitized strings directly to the JavaScript engine interpreter.',
+    why: 'Attackers can exploit eval() to execute arbitrary script in the client browser, compromising credentials and session integrity.',
+    fix: 'Replace eval() with JSON.parse() for structured data or a dedicated math parser.',
+    code: 'const data = JSON.parse(userString);',
+    ref: 'https://eslint.org/docs/latest/rules/no-eval'
+  },
+  'eslint:no-implied-eval': {
+    title: 'Implied eval via String Passed to Timer.',
+    explanation: 'Passing a string to setTimeout or setInterval functions evaluates dynamically similarly to eval().',
+    why: 'Strings in timers create injection risks and reduce interpreter optimization.',
+    fix: 'Pass an inline or arrow function callback: () => { ... }',
+    code: 'setTimeout(() => { doSomething(); }, 100);',
+    ref: 'https://eslint.org/docs/latest/rules/no-implied-eval'
+  },
+  'eslint:no-unsafe-innerhtml': {
+    title: 'Direct innerHTML Assignment (XSS Risk).',
+    explanation: 'Direct assignment of dynamic content to innerHTML or outerHTML without sanitization.',
+    why: 'Assigning unsanitized strings to innerHTML allows attackers to inject malicious HTML and script tags.',
+    fix: 'Use element.textContent or element.replaceChildren(), or sanitize HTML with DOMPurify.',
+    code: 'element.textContent = userContent;',
+    ref: 'https://owasp.org/www-community/attacks/xss/'
+  },
+  'eslint:no-debugger': {
+    title: "Unexpected 'debugger' Statement.",
+    explanation: 'debugger statements force developer devtools to pause and freeze page execution.',
+    why: 'Leaving debugger statements in production degrades user experience and halts application flow.',
+    fix: 'Remove debugger statements prior to release.',
+    code: '',
+    ref: 'https://eslint.org/docs/latest/rules/no-debugger'
+  },
+  'eslint:no-alert': {
+    title: 'Synchronous UI Dialog (alert/confirm/prompt).',
+    explanation: 'Synchronous modal alerts block the browser UI event thread.',
+    why: 'Modal dialogs like alert() disrupt user interaction and cannot be styled cleanly.',
+    fix: 'Replace modal dialogs with custom UI modals or non-blocking toast notifications.',
+    code: 'toast("Action completed");',
+    ref: 'https://eslint.org/docs/latest/rules/no-alert'
+  },
+  'eslint:eqeqeq': {
+    title: 'Loose Equality Comparison (eqeqeq).',
+    explanation: "Expected strict equality operator ('===' or '!==') instead of loose comparison.",
+    why: 'Implicit type coercion with loose equality operators causes subtle truthiness bugs and unexpected conversions.',
+    fix: "Replace '==' with '===' or '!=' with '!==' to avoid implicit type coercion.",
+    code: 'if (value === expected) { ... }',
+    ref: 'https://eslint.org/docs/latest/rules/eqeqeq'
+  },
+  'eslint:no-var': {
+    title: "Unexpected 'var' Declaration.",
+    explanation: "Variable declared using 'var' instead of modern block-scoped declarations.",
+    why: "'var' is function-scoped and hoisted, which often leads to unintended variable shadowing and scope leakage.",
+    fix: "Use 'const' for immutable values or 'let' for re-assignable variables.",
+    code: 'const item = initialValue;',
+    ref: 'https://eslint.org/docs/latest/rules/no-var'
+  },
+  'eslint:no-console': {
+    title: 'Unexpected Console Statement in Production Code.',
+    explanation: 'Console statements (log, debug, warn) detected in client source.',
+    why: 'Console output can leak sensitive application state or performance data in user browsers.',
+    fix: 'Remove debug console logging before building for production.',
+    code: '',
+    ref: 'https://eslint.org/docs/latest/rules/no-console'
+  },
+  'eslint:syntax-error': {
+    title: 'JavaScript Syntax Parsing Error.',
+    explanation: 'The JavaScript parser encountered invalid syntax or unexpected tokens in this file.',
+    why: 'Syntax errors prevent the file from compiling and executing in the browser or Node.js runtime.',
+    fix: 'Correct syntax errors, unclosed brackets, or invalid syntax keywords.',
+    code: '',
+    ref: 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Errors'
   }
 };
 
@@ -731,9 +803,16 @@ function renderAnalysisOutput(data, scrollIntoView = true){
 
 let LAST_GITHUB_DATA = null;
 let GH_FILTERS = { sev: 'ALL', tool: 'ALL' };
+let GH_DISPLAY_LIMIT = 30;
 
 function setGhFilter(key, val) {
   GH_FILTERS[key] = val;
+  GH_DISPLAY_LIMIT = 30;
+  if (LAST_GITHUB_DATA) renderGithubOutput(LAST_GITHUB_DATA, false);
+}
+
+function loadMoreGhFindings() {
+  GH_DISPLAY_LIMIT += 30;
   if (LAST_GITHUB_DATA) renderGithubOutput(LAST_GITHUB_DATA, false);
 }
 
@@ -780,26 +859,46 @@ function renderGithubOutput(data, scrollIntoView = true) {
   const warnCount = enhancedFindings.filter(f => f.severity === 'WARNING').length;
   const infoCount = enhancedFindings.filter(f => f.severity === 'INFORMATIONAL').length;
 
-  // Health Score color
-  const score = metrics.health_score ?? 85;
+  // Health Score calculation
+  const score = metrics.health_score;
+  const hasScore = (score !== null && score !== undefined);
   let scoreColor = 'var(--grn)';
-  if (score < 50) scoreColor = 'var(--red)';
-  else if (score < 75) scoreColor = 'var(--amb)';
-  else if (score < 90) scoreColor = 'var(--blu)';
+  if (hasScore) {
+    if (score < 50) scoreColor = 'var(--red)';
+    else if (score < 75) scoreColor = 'var(--amb)';
+    else if (score < 90) scoreColor = 'var(--blu)';
+  } else {
+    scoreColor = 'var(--mut)';
+  }
+  const scoreDisplay = hasScore
+    ? `${score}<span style="font-size:14px;color:var(--mut)">/100</span>`
+    : `<span style="font-size:15px;color:var(--mut)">Not available</span>`;
 
-  // Languages breakdown
+  // Languages breakdown (handles both dict and array representations)
   const langs = repo.languages || {};
-  const totalBytes = Object.values(langs).reduce((a, b) => a + b, 0) || 1;
-  const langEntries = Object.entries(langs).map(([name, bytes]) => ({
-    name,
-    bytes,
-    pct: ((bytes / totalBytes) * 100).toFixed(1)
-  })).sort((a, b) => b.bytes - a.bytes);
+  let langEntries = [];
+  if (Array.isArray(langs)) {
+    langEntries = langs.map(l => ({
+      name: l.language || l.name,
+      bytes: l.bytes || 0,
+      pct: l.percentage ? Number(l.percentage).toFixed(1) : '0.0'
+    }));
+  } else if (typeof langs === 'object' && langs !== null) {
+    const totalBytes = Object.values(langs).reduce((a, b) => (typeof b === 'number' ? a + b : a), 0) || 1;
+    langEntries = Object.entries(langs).map(([name, bytes]) => ({
+      name,
+      bytes: typeof bytes === 'number' ? bytes : 0,
+      pct: typeof bytes === 'number' ? ((bytes / totalBytes) * 100).toFixed(1) : '0.0'
+    })).sort((a, b) => b.bytes - a.bytes);
+  }
 
   const langPalette = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#6366f1'];
   const langBarHtml = langEntries.map((l, i) => `
-    <div style="width:${l.pct}%;background:${langPalette[i % langPalette.length]};height:100%" title="${l.name}: ${l.pct}%"></div>
+    <div style="width:${l.pct}%;background:${langPalette[i % langPalette.length]};height:100%" title="${escapeHtml(l.name)}: ${l.pct}%"></div>
   `).join('');
+
+  const createdDate = (repo.created_at && repo.created_at !== 'Not available') ? new Date(repo.created_at).toLocaleDateString() : 'Not available';
+  const updatedDate = (repo.updated_at && repo.updated_at !== 'Not available') ? new Date(repo.updated_at).toLocaleDateString() : 'Not available';
 
   // 1. Repository Information Section
   const repoInfoHtml = `
@@ -811,7 +910,7 @@ function renderGithubOutput(data, scrollIntoView = true) {
             <span class="chip ${repo.private ? 'c-a' : 'c-g'}" style="font-size:12px">${repo.private ? '🔒 Private' : '🌐 Public'}</span>
             <span class="chip c-b" style="font-size:12px">Branch: ${escapeHtml(data.branch || repo.default_branch || 'main')}</span>
           </div>
-          <p class="mut" style="font-size:13.5px;margin:6px 0 0">${escapeHtml(repo.description || 'No description provided for this repository.')}</p>
+          <p class="mut" style="font-size:13.5px;margin:6px 0 0">${escapeHtml(repo.description || 'Not available')}</p>
         </div>
         <a href="${escapeHtml(repo.html_url || ('https://github.com/' + (repo.full_name || '')))}" target="_blank" rel="noopener" class="btn ghost" style="padding:6px 14px;font-size:12.5px;flex:none;animation:none">View on GitHub ↗</a>
       </div>
@@ -820,7 +919,7 @@ function renderGithubOutput(data, scrollIntoView = true) {
       <div class="grid g4 mt" style="gap:10px;margin-bottom:16px">
         <div style="background:rgba(8,11,26,.6);padding:12px;border-radius:10px;border:1px solid var(--line)">
           <small class="mut">Primary Language</small>
-          <div style="font-size:17px;font-weight:700;color:var(--tx);margin-top:2px">${escapeHtml(repo.primary_language || 'Various')}</div>
+          <div style="font-size:17px;font-weight:700;color:var(--tx);margin-top:2px">${escapeHtml(repo.primary_language || 'Not specified')}</div>
         </div>
         <div style="background:rgba(8,11,26,.6);padding:12px;border-radius:10px;border:1px solid var(--line)">
           <small class="mut">Stars / Forks</small>
@@ -828,11 +927,11 @@ function renderGithubOutput(data, scrollIntoView = true) {
         </div>
         <div style="background:rgba(8,11,26,.6);padding:12px;border-radius:10px;border:1px solid var(--line)">
           <small class="mut">Open Issues / Size</small>
-          <div style="font-size:17px;font-weight:700;color:var(--tx);margin-top:2px">🐛 ${repo.open_issues ?? 0} · 💾 ${(repo.size_kb ? (repo.size_kb > 1024 ? (repo.size_kb/1024).toFixed(1) + ' MB' : repo.size_kb + ' KB') : 'N/A')}</div>
+          <div style="font-size:17px;font-weight:700;color:var(--tx);margin-top:2px">🐛 ${repo.open_issues ?? 0} · 💾 ${(repo.size_kb ? (repo.size_kb > 1024 ? (repo.size_kb/1024).toFixed(1) + ' MB' : repo.size_kb + ' KB') : '0 KB')}</div>
         </div>
         <div style="background:rgba(8,11,26,.6);padding:12px;border-radius:10px;border:1px solid var(--line)">
           <small class="mut">License</small>
-          <div style="font-size:17px;font-weight:700;color:var(--tx);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(repo.license || 'Not specified')}</div>
+          <div style="font-size:17px;font-weight:700;color:var(--tx);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(repo.license || 'Not available')}</div>
         </div>
       </div>
 
@@ -857,19 +956,19 @@ function renderGithubOutput(data, scrollIntoView = true) {
       </div>
 
       <div style="font-size:12px;color:var(--mut);margin-top:14px">
-        📅 <b>Created:</b> ${repo.created_at ? new Date(repo.created_at).toLocaleString() : 'N/A'} · 🔄 <b>Last Updated:</b> ${repo.updated_at ? new Date(repo.updated_at).toLocaleString() : 'N/A'}
+        📅 <b>Created:</b> ${createdDate} · 🔄 <b>Last Updated:</b> ${updatedDate}
       </div>
     </div>
   `;
 
   // 2. File Structure Section
   const entryBadges = (struct.entry_points || []).map(p => `<span class="chip c-b" style="font-family:monospace">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">None detected</span>';
-  const frontBadges = (struct.frontend || []).map(p => `<span class="chip c-g" style="font-family:monospace">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">None detected</span>';
-  const backBadges = (struct.backend || []).map(p => `<span class="chip c-b" style="font-family:monospace">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">None detected</span>';
-  const dbBadges = (struct.database || []).map(p => `<span class="chip c-a" style="font-family:monospace">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">None detected</span>';
-  const routeBadges = (struct.routes || []).map(p => `<span class="chip c-b" style="font-family:monospace">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">None detected</span>';
-  const configBadges = (struct.configs || []).map(p => `<span class="chip" style="font-family:monospace;background:rgba(196,181,253,.1);border-color:var(--line)">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">None detected</span>';
-  const testBadges = (struct.tests || []).map(p => `<span class="chip c-g" style="font-family:monospace">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">No test suite detected</span>';
+  const frontBadges = (struct.frontend || struct.frontend_files || []).map(p => `<span class="chip c-g" style="font-family:monospace">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">None detected</span>';
+  const backBadges = (struct.backend || struct.backend_files || []).map(p => `<span class="chip c-b" style="font-family:monospace">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">None detected</span>';
+  const dbBadges = (struct.database || struct.database_files || []).map(p => `<span class="chip c-a" style="font-family:monospace">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">None detected</span>';
+  const routeBadges = (struct.routes || struct.api_routes || []).map(p => `<span class="chip c-b" style="font-family:monospace">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">None detected</span>';
+  const configBadges = (struct.configs || struct.config_files || []).map(p => `<span class="chip" style="font-family:monospace;background:rgba(196,181,253,.1);border-color:var(--line)">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">None detected</span>';
+  const testBadges = (struct.tests || struct.test_files || []).map(p => `<span class="chip c-g" style="font-family:monospace">${escapeHtml(p)}</span>`).join('') || '<span class="mut" style="font-size:12.5px">No test suite detected</span>';
 
   const paths = tree.paths || [];
   const fileTreeHtml = paths.map(p => {
@@ -941,7 +1040,7 @@ function renderGithubOutput(data, scrollIntoView = true) {
     </div>
   `;
 
-  // 3. Static Analysis Results Section
+  // 3. Static Analysis Results Section (Redesigned Compact UI)
   const filteredFindings = enhancedFindings.filter(f => {
     if (GH_FILTERS.sev !== 'ALL') {
       if (f.severity !== GH_FILTERS.sev) return false;
@@ -953,91 +1052,108 @@ function renderGithubOutput(data, scrollIntoView = true) {
     return true;
   });
 
+  const toolsRan = (data.tools || []).filter(t => t.ran);
+  const toolLabels = toolsRan.map(t => `${t.name}${t.version ? ' (' + t.version + ')' : ''}`).join(', ') || 'static_analyzer';
+  const toolOptions = Array.from(new Set(enhancedFindings.map(f => (f.tool || 'static_analyzer').toLowerCase())))
+    .map(t => `<option value="${t}" ${GH_FILTERS.tool.toLowerCase() === t ? 'selected' : ''}>Tool: ${t}</option>`)
+    .join('');
+
+  // Compact pagination to keep UI light and fast
+  const displayLimit = GH_DISPLAY_LIMIT || 30;
+  const displayedFindings = filteredFindings.slice(0, displayLimit);
+  const hasMoreFindings = filteredFindings.length > displayLimit;
+
   const staticFindingsHtml = enhancedFindings.length === 0 ? `
-    <div style="padding:16px 20px;background:rgba(74,222,128,.04);border:1px dashed rgba(74,222,128,.2);border-radius:10px;color:var(--grn);font-size:13.5px">
-      ✅ Checks completed successfully without detected issues. No security vulnerabilities or linting errors detected across source files.
+    <div style="padding:14px 18px;background:rgba(74,222,128,.04);border:1px dashed rgba(74,222,128,.2);border-radius:8px;color:var(--grn);font-size:13px;display:flex;align-items:center;gap:8px">
+      <span>✅</span>
+      <span>No issues detected in this category. All checks completed successfully.</span>
     </div>
   ` : (filteredFindings.length === 0 ? `
-    <div class="mut" style="padding:14px 18px;background:rgba(16,22,43,.4);border-radius:10px;font-size:13px">
+    <div class="mut" style="padding:12px 16px;background:rgba(16,22,43,.4);border-radius:8px;font-size:12.5px">
       No static analysis findings match the selected filter (${GH_FILTERS.sev} / ${GH_FILTERS.tool}).
     </div>
-  ` : filteredFindings.map((f, i) => {
-    const codeId = `gh-snip-${i}`;
-    const chipClass = f.severity === 'CRITICAL' ? 'c-r' : (f.severity === 'WARNING' ? 'c-a' : 'c-b');
-
-    return `
-      <details class="finding-card" style="margin-bottom:12px;background:rgba(8,11,26,.7);border:1px solid rgba(196,181,253,.2);border-radius:10px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.25)">
-        <summary style="padding:12px 16px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-          <div class="row" style="gap:8px;flex-wrap:wrap">
-            <span class="chip ${chipClass}" style="font-size:11px;font-weight:700">${f.severity}</span>
-            <code style="font-size:12px;color:var(--l);background:rgba(196,181,253,.1);padding:2px 6px;border-radius:4px">${escapeHtml(f.rule_id)}</code>
-            <b style="color:var(--tx);font-size:13.5px">${escapeHtml(f.title)}</b>
-            <span class="mut" style="font-size:12px">via ${escapeHtml(f.tool)}</span>
-          </div>
-          <span style="font-family:monospace;font-size:12px;color:var(--tx);background:rgba(255,255,255,.05);padding:3px 8px;border-radius:4px">
-            📁 ${escapeHtml(f.file_path)}${f.line_number ? ' : L' + f.line_number : ''}
-          </span>
-        </summary>
-        <div style="padding:14px 18px 18px;border-top:1px solid rgba(196,181,253,.12);font-size:13px;line-height:1.6">
-          <div style="margin-bottom:10px">
-            <b class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Detailed Explanation:</b>
-            <div style="color:var(--tx);margin-top:2px">${escapeHtml(f.explanation)}</div>
-          </div>
-
-          <div style="margin-bottom:10px">
-            <b class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Why This Issue Matters:</b>
-            <div style="color:var(--tx);margin-top:2px">${escapeHtml(f.why)}</div>
-          </div>
-
-          ${f.evidence ? `
-            <div style="margin-bottom:10px">
-              <b class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Problematic Code Snippet:</b>
-              <pre style="background:rgba(0,0,0,.6);border:1px solid rgba(248,113,113,.2);border-radius:6px;padding:8px 12px;font-size:12px;margin:4px 0;color:#fca5a5;overflow:auto"><code>${escapeHtml(f.evidence)}</code></pre>
+  ` : `
+    <div style="display:flex;flex-direction:column;gap:5px">
+      ${displayedFindings.map((f, i) => {
+        const codeId = `gh-snip-${i}`;
+        const chipClass = f.severity === 'CRITICAL' ? 'c-r' : (f.severity === 'WARNING' ? 'c-a' : 'c-b');
+        return `
+          <details class="finding-compact" style="background:rgba(8,11,26,.6);border:1px solid rgba(196,181,253,.15);border-radius:6px;overflow:hidden">
+            <summary style="padding:7px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;user-select:none">
+              <div class="row" style="gap:6px;align-items:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">
+                <span class="chip ${chipClass}" style="font-size:9.5px;padding:1px 5px;flex:none">${f.severity}</span>
+                <code style="font-size:11px;color:var(--l);background:rgba(196,181,253,.08);padding:1px 5px;border-radius:3px;flex:none">${escapeHtml(f.rule_id)}</code>
+                <span style="color:var(--tx);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(f.title)}</span>
+              </div>
+              <span style="font-family:monospace;font-size:11px;color:var(--mut);flex:none;margin-left:8px">
+                ${escapeHtml(f.file_path)}${f.line_number ? ':' + f.line_number : ''}
+              </span>
+            </summary>
+            <div style="padding:10px 14px;border-top:1px solid rgba(196,181,253,.1);font-size:12.5px;line-height:1.5;background:rgba(0,0,0,.25)">
+              <div style="margin-bottom:8px">
+                <b class="mut" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px">Technical Explanation:</b>
+                <div style="color:var(--tx);margin-top:2px">${escapeHtml(f.explanation)}</div>
+              </div>
+              <div style="margin-bottom:8px">
+                <b class="mut" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px">Why This Matters:</b>
+                <div style="color:var(--tx);margin-top:2px">${escapeHtml(f.why)}</div>
+              </div>
+              ${f.evidence ? `
+                <div style="margin-bottom:8px">
+                  <b class="mut" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px">Problematic Code Snippet:</b>
+                  <pre style="background:rgba(0,0,0,.6);border:1px solid rgba(248,113,113,.2);border-radius:5px;padding:6px 10px;font-size:11.5px;margin:3px 0;color:#fca5a5;overflow:auto"><code>${escapeHtml(f.evidence)}</code></pre>
+                </div>
+              ` : ''}
+              <div style="margin-bottom:6px">
+                <div class="row sp" style="margin-bottom:2px">
+                  <b style="color:var(--grn);font-size:11px;text-transform:uppercase;letter-spacing:.5px">Suggested Corrective Action:</b>
+                  ${f.fix && !f.fix.startsWith('http') && f.fix.includes('\n') ? `<button type="button" class="btn ghost" onclick="copySnippet(this, '${codeId}')" style="padding:1px 6px;font-size:10px;animation:none">Copy Fix</button>` : ''}
+                </div>
+                ${f.fix && !f.fix.startsWith('http') && f.fix.includes('\n') ? `
+                  <pre style="background:rgba(0,0,0,.6);border:1px solid rgba(74,222,128,.2);border-radius:5px;padding:6px 10px;font-size:11.5px;margin:0;color:#86efac;overflow:auto"><code id="${codeId}">${escapeHtml(f.fix)}</code></pre>
+                ` : `<div style="color:var(--l);margin-top:2px">${escapeHtml(f.fix)}</div>`}
+              </div>
+              ${f.ref ? `
+                <div style="margin-top:8px;font-size:11.5px">
+                  <a href="${escapeHtml(f.ref)}" target="_blank" rel="noopener" style="color:var(--blu);text-decoration:none">🔗 Reference Documentation ↗</a>
+                </div>
+              ` : ''}
             </div>
-          ` : ''}
-
-          <div style="margin-bottom:8px">
-            <div class="row sp" style="margin-bottom:4px">
-              <b style="color:var(--grn);font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Suggested Corrective Action:</b>
-              ${f.fix && !f.fix.startsWith('http') && f.fix.includes('\n') ? `<button type="button" class="btn ghost" onclick="copySnippet(this, '${codeId}')" style="padding:2px 8px;font-size:11px;animation:none">Copy Fix</button>` : ''}
-            </div>
-            ${f.fix && !f.fix.startsWith('http') && f.fix.includes('\n') ? `
-              <pre style="background:rgba(0,0,0,.6);border:1px solid rgba(74,222,128,.2);border-radius:6px;padding:8px 12px;font-size:12px;margin:0;color:#86efac;overflow:auto"><code id="${codeId}">${escapeHtml(f.fix)}</code></pre>
-            ` : `<div style="color:var(--l);margin-top:2px">${escapeHtml(f.fix)}</div>`}
-          </div>
-
-          ${f.ref ? `
-            <div style="margin-top:10px;font-size:12px">
-              <a href="${escapeHtml(f.ref)}" target="_blank" rel="noopener" style="color:var(--blu);text-decoration:none">🔗 Reference Documentation ↗</a>
-            </div>
-          ` : ''}
+          </details>
+        `;
+      }).join('')}
+      ${hasMoreFindings ? `
+        <div style="text-align:center;margin-top:10px">
+          <button type="button" class="btn ghost" onclick="loadMoreGhFindings()" style="padding:6px 16px;font-size:12px;animation:none">
+            Load More Findings (${displayedFindings.length} of ${filteredFindings.length}) ▾
+          </button>
         </div>
-      </details>
-    `;
-  }).join(''));
+      ` : ''}
+    </div>
+  `);
 
   const staticAnalysisHtml = `
-    <div style="padding:4px 0">
-      <!-- Filter Bar -->
-      <div class="row sp" style="margin-bottom:14px;background:rgba(8,11,26,.5);padding:10px 14px;border-radius:10px;border:1px solid var(--line)">
-        <div class="row" style="gap:10px">
-          <span style="font-size:12.5px;color:var(--l);font-weight:600">Filters:</span>
-          <select style="width:auto;padding:5px 10px;font-size:12px" onchange="setGhFilter('sev', this.value)" aria-label="Filter Severity">
-            <option value="ALL" ${GH_FILTERS.sev === 'ALL' ? 'selected' : ''}>Severity: All (${enhancedFindings.length})</option>
+    <div style="padding:2px 0">
+      <!-- Compact Summary & Filter Row -->
+      <div class="row sp" style="align-items:center;padding:8px 12px;background:rgba(8,11,26,.6);border:1px solid var(--line);border-radius:8px;margin-bottom:10px;font-size:12px;flex-wrap:wrap;gap:8px">
+        <div class="row" style="gap:8px;align-items:center">
+          <span style="font-weight:600;color:var(--tx)">Total Issues: <span style="color:${enhancedFindings.length ? 'var(--red)' : 'var(--grn)'}">${enhancedFindings.length}</span></span>
+          <span class="chip c-r" style="font-size:10px;padding:1px 6px">Crit: ${critCount}</span>
+          <span class="chip c-a" style="font-size:10px;padding:1px 6px">Warn: ${warnCount}</span>
+          <span class="chip c-b" style="font-size:10px;padding:1px 6px">Info: ${infoCount}</span>
+        </div>
+        <div class="row" style="gap:8px;align-items:center">
+          <select style="width:auto;padding:3px 8px;font-size:11.5px;height:26px" onchange="setGhFilter('sev', this.value)" aria-label="Filter Severity">
+            <option value="ALL" ${GH_FILTERS.sev === 'ALL' ? 'selected' : ''}>All Severities (${enhancedFindings.length})</option>
             <option value="Critical" ${GH_FILTERS.sev === 'Critical' ? 'selected' : ''}>Critical (${critCount})</option>
             <option value="Warning" ${GH_FILTERS.sev === 'Warning' ? 'selected' : ''}>Warning (${warnCount})</option>
             <option value="Informational" ${GH_FILTERS.sev === 'Informational' ? 'selected' : ''}>Informational (${infoCount})</option>
           </select>
-          <select style="width:auto;padding:5px 10px;font-size:12px" onchange="setGhFilter('tool', this.value)" aria-label="Filter Tool">
-            <option value="ALL" ${GH_FILTERS.tool === 'ALL' ? 'selected' : ''}>Tool: All Analyzers</option>
-            <option value="bandit" ${GH_FILTERS.tool === 'bandit' ? 'selected' : ''}>Bandit</option>
-            <option value="ruff" ${GH_FILTERS.tool === 'ruff' ? 'selected' : ''}>Ruff</option>
-            <option value="radon" ${GH_FILTERS.tool === 'radon' ? 'selected' : ''}>Radon</option>
-            <option value="ast" ${GH_FILTERS.tool === 'ast' ? 'selected' : ''}>AST</option>
+          <select style="width:auto;padding:3px 8px;font-size:11.5px;height:26px" onchange="setGhFilter('tool', this.value)" aria-label="Filter Tool">
+            <option value="ALL" ${GH_FILTERS.tool === 'ALL' ? 'selected' : ''}>All Tools</option>
+            ${toolOptions}
           </select>
-        </div>
-        <div style="font-size:12px;color:var(--mut)">
-          Scanners: <b>radon (6.0.1)</b>, <b>ruff (0.17.5)</b>, <b>bandit (1.9.4)</b>, <b>builtin-ast</b>
+          <span class="mut" style="font-size:11px">Scanners: <b>${escapeHtml(toolLabels)}</b></span>
         </div>
       </div>
 
@@ -1060,27 +1176,27 @@ function renderGithubOutput(data, scrollIntoView = true) {
       <div class="grid g2" style="gap:12px">
         <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:10px;padding:14px">
           <h4 style="font-size:13.5px;color:var(--l);margin:0 0 8px">🏗️ Project Architecture Assessment</h4>
-          <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(ai.project_architecture || 'Modular structure with clear boundaries between controllers and service layers.')}</p>
+          <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(ai.project_architecture || 'Modular structure with functional boundaries.')}</p>
         </div>
         <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:10px;padding:14px">
           <h4 style="font-size:13.5px;color:var(--grn);margin:0 0 8px">💎 Code Quality & Maintainability</h4>
-          <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(ai.code_quality_assessment || 'Code adheres to naming standards and maintainability baselines.')}</p>
+          <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(ai.code_quality || ai.code_quality_assessment || 'Code adheres to standard naming and maintainability baselines.')}</p>
         </div>
         <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:10px;padding:14px">
           <h4 style="font-size:13.5px;color:var(--blu);margin:0 0 8px">🧩 Implementation & Pattern Analysis</h4>
-          <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(ai.implementation_details || 'Leverages standard language features with functional decomposition.')}</p>
+          <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(ai.implementation_analysis || ai.implementation_details || 'Leverages standard language features with functional decomposition.')}</p>
         </div>
         <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:10px;padding:14px">
           <h4 style="font-size:13.5px;color:var(--red);margin:0 0 8px">🔒 Security & Risk Assessment</h4>
-          <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(ai.security_assessment || 'No critical remote code execution vectors found.')}</p>
+          <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(ai.security_review || ai.security_assessment || 'No critical vulnerabilities detected.')}</p>
         </div>
         <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:10px;padding:14px">
           <h4 style="font-size:13.5px;color:var(--amb);margin:0 0 8px">⚡ Performance & Scalability</h4>
-          <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(ai.performance_assessment || 'Asynchronous non-blocking architecture allows high throughput.')}</p>
+          <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(ai.performance || ai.performance_assessment || 'Runtime performance evaluated across modules.')}</p>
         </div>
         <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:10px;padding:14px">
           <h4 style="font-size:13.5px;color:var(--grn);margin:0 0 8px">🧪 Testing & Reliability Status</h4>
-          <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(ai.testing_status || (struct.has_tests ? 'Automated test suite detected in repository.' : 'No automated test suite detected. Recommended adding pytest/unittest.'))}</p>
+          <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(ai.testing || ai.testing_status || (struct.has_tests ? 'Automated test suite detected in repository.' : 'No automated test suite detected.'))}</p>
         </div>
       </div>
     </div>
@@ -1095,6 +1211,8 @@ function renderGithubOutput(data, scrollIntoView = true) {
     const pri = (s.priority || 'Medium').toLowerCase();
     const priChip = pri === 'high' ? 'c-r' : (pri === 'medium' ? 'c-a' : 'c-b');
     const codeId = `sugg-code-${idx}`;
+    const codeExample = s.suggested_implementation || s.code_example || '';
+    const affected = s.affected_file || s.affected_components || '';
 
     return `
       <div style="margin-bottom:14px;background:rgba(8,11,26,.7);border:1px solid rgba(196,181,253,.2);border-radius:10px;padding:16px">
@@ -1103,9 +1221,9 @@ function renderGithubOutput(data, scrollIntoView = true) {
             <span class="chip ${priChip}" style="font-size:11px;font-weight:700">${escapeHtml((s.priority || 'MEDIUM').toUpperCase())} PRIORITY</span>
             <span class="chip c-b" style="font-size:11.5px">${escapeHtml(s.category || 'Architecture')}</span>
           </div>
-          ${s.affected_components ? `
+          ${affected ? `
             <span class="mut" style="font-size:12px;font-family:monospace;background:rgba(255,255,255,.05);padding:2px 8px;border-radius:4px">
-              🎯 ${escapeHtml(Array.isArray(s.affected_components) ? s.affected_components.join(', ') : s.affected_components)}
+              🎯 ${escapeHtml(Array.isArray(affected) ? affected.join(', ') : affected)}
             </span>
           ` : ''}
         </div>
@@ -1119,13 +1237,13 @@ function renderGithubOutput(data, scrollIntoView = true) {
           </div>
         ` : ''}
 
-        ${s.code_example ? `
+        ${codeExample ? `
           <div style="margin-top:8px">
             <div class="row sp" style="margin-bottom:4px">
               <small class="mut" style="font-weight:600">Implementation Proposal / Code Example:</small>
               <button type="button" class="btn ghost" onclick="copySnippet(this, '${codeId}')" style="padding:2px 8px;font-size:11px;animation:none">Copy Code</button>
             </div>
-            <pre style="background:rgba(0,0,0,.65);border:1px solid rgba(196,181,253,.15);border-radius:8px;padding:10px 12px;font-size:12px;margin:0;color:#c4b5fd;overflow:auto"><code id="${codeId}">${escapeHtml(s.code_example)}</code></pre>
+            <pre style="background:rgba(0,0,0,.65);border:1px solid rgba(196,181,253,.15);border-radius:8px;padding:10px 12px;font-size:12px;margin:0;color:#c4b5fd;overflow:auto"><code id="${codeId}">${escapeHtml(codeExample)}</code></pre>
           </div>
         ` : ''}
       </div>
@@ -1171,7 +1289,7 @@ function renderGithubOutput(data, scrollIntoView = true) {
         <div style="background:rgba(8,11,26,.6);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
           <small class="mut">Repository Health Score</small>
           <div style="font-size:22px;font-weight:700;color:${scoreColor};margin-top:2px">
-            ${score}<span style="font-size:14px;color:var(--mut)">/100</span>
+            ${scoreDisplay}
           </div>
         </div>
       </div>
@@ -1180,6 +1298,70 @@ function renderGithubOutput(data, scrollIntoView = true) {
         ℹ️ <b>Scoring Methodology:</b> ${escapeHtml(metrics.scoring_methodology || 'Score starts at 100, penalized by Critical vulnerabilities and Warnings, adjusted for test suites and complexity.')}
       </div>
     </div>
+
+    <!-- The 5 Expandable Sections (Preserved Exactly) -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">1. Repository Information</b>
+          <span class="chip c-b" style="font-size:12px">${escapeHtml(repo.primary_language || 'Repo Info')}</span>
+        </div>
+        <span class="chip c-g">READY</span>
+      </summary>
+      <div style="padding:16px 20px 20px">${repoInfoHtml}</div>
+    </details>
+
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">2. File Structure</b>
+          <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);border-color:rgba(196,181,253,.25);color:var(--l)">${tree.total_files || 0} Files · ${tree.total_folders || 0} Folders</span>
+        </div>
+        <span class="chip c-g">CLASSIFIED</span>
+      </summary>
+      <div style="padding:16px 20px 20px">${fileStructureHtml}</div>
+    </details>
+
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">3. Static Analysis Results</b>
+          <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);border-color:rgba(196,181,253,.25);color:var(--l)">${enhancedFindings.length} Issue(s)</span>
+        </div>
+        <div class="row" style="gap:10px">
+          ${critCount ? '<span class="chip c-r">CRITICAL</span>' : (warnCount ? '<span class="chip c-a">WARNING</span>' : '<span class="chip c-g">PASSED</span>')}
+        </div>
+      </summary>
+      <div style="padding:16px 20px 20px">${staticAnalysisHtml}</div>
+    </details>
+
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">4. AI-Generated Review</b>
+          <span class="chip c-b" style="font-size:12px">Senior Architect Review</span>
+        </div>
+        <span class="chip c-g">COMPLETED</span>
+      </summary>
+      <div style="padding:16px 20px 20px">${aiReviewHtml}</div>
+    </details>
+
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">5. Improvement Suggestions</b>
+          <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);border-color:rgba(196,181,253,.25);color:var(--l)">${suggestions.length} Recommendation(s)</span>
+        </div>
+        <span class="chip c-b">ACTIONABLE</span>
+      </summary>
+      <div style="padding:16px 20px 20px">${suggestionsHtml}</div>
+    </details>
+  `;
+
+  if (scrollIntoView) {
+    setTimeout(() => el.scrollIntoView({ behavior: 'smooth' }), 100);
+  }
+}
 
     <!-- The 5 Expandable Sections (Preserved Exactly) -->
     <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
