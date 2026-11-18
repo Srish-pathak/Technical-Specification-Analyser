@@ -9,6 +9,7 @@ ruff>=0.4
 bandit>=1.7
 # Later phases
 reportlab>=4.0               # PDF reports
+pypdf>=5.0                   # PDF text extraction and parsing
 httpx>=0.27                  # GitHub fetching, AI provider calls, API tests
 # Testing (tests also run under plain `python -m unittest`)
 pytest>=8.0

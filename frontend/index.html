@@ -192,7 +192,51 @@ def calculate_score(user_query):
   </div>
 </div>`,
 
-'pdf-analysis':()=>head('PDF Analysis','Upload a technical specification to extract and review it.')+`<div class="card"><label class="drop" id="dz" style="display:block;cursor:pointer"><div class="ic" style="margin:0 auto 12px">${ic('pdf')}</div><b style="color:var(--tx)">Drag and drop a PDF here</b><br>or click to choose a file<input id="pf" type="file" accept="application/pdf" hidden></label><div id="pi" class="mt"></div><div class="row mt"><button class="btn" id="an"><span class="spin"></span>Analyze PDF</button></div><div class="prog" id="pg"><i></i></div></div>`+results(['Extracted Technical Specifications','AI-Generated Insights','Downloadable Reports'],NOENG),
+'pdf-analysis':()=>head('PDF Technical Specification Analyzer','Upload or drag-and-drop a technical specification PDF to extract architecture, verify requirements, evaluate risks, and compute specification quality score.')+`
+<div class="card">
+  <div id="drop-zone" class="drop" style="display:block;cursor:pointer;transition:border-color .2s,background .2s;text-align:center;padding:32px 20px">
+    <div class="ic" style="margin:0 auto 12px">${ic('pdf')}</div>
+    <b style="color:var(--tx);font-size:16px">Drag and drop a PDF technical specification here</b><br>
+    <span class="mut" style="font-size:13px">or click to browse files from your computer (PDF only, up to 20MB)</span>
+    <input id="pf" type="file" accept=".pdf,application/pdf" hidden>
+  </div>
+
+  <div id="file-info-bar" style="display:none;margin-top:14px;padding:12px 16px;background:rgba(8,11,26,.7);border:1px solid rgba(196,181,253,.2);border-radius:10px;align-items:center;justify-content:space-between">
+    <div class="row" style="gap:10px;align-items:center">
+      <span style="font-size:22px">📄</span>
+      <div>
+        <b id="file-name" style="color:var(--tx);font-size:14px">document.pdf</b>
+        <div id="file-size" class="mut" style="font-size:12px">0 KB · Ready for Analysis</div>
+      </div>
+    </div>
+    <div class="row" style="gap:8px">
+      <span class="chip c-g" style="font-size:11px">READY</span>
+      <button type="button" class="btn ghost" id="pdf-clear" style="padding:4px 10px;font-size:12px;animation:none">❌ Remove</button>
+    </div>
+  </div>
+
+  <div class="row mt sp" style="align-items:center;flex-wrap:wrap;gap:10px">
+    <div class="row" style="gap:10px;flex-wrap:wrap">
+      <button type="button" class="btn ghost" id="pdf-sample-btn" style="padding:10px 18px;animation:none">⚡ Sample Tech Spec</button>
+      <button class="btn" id="an"><span class="spin"></span>Analyze PDF</button>
+    </div>
+    <span class="mut" id="pdf-hint" style="font-size:12.5px">Select or drop a PDF document to begin analysis</span>
+  </div>
+
+  <div class="prog" id="pg" style="margin-top:14px;display:none"><i></i></div>
+  <div id="pg-status" class="mut" style="font-size:12.5px;margin-top:8px;display:none;align-items:center;gap:8px">
+    <span class="spin" style="display:inline-block;width:13px;height:13px;border-width:1.5px"></span>
+    <span id="pg-text">Uploading document...</span>
+  </div>
+</div>
+
+<div id="pdf-results" class="mt">
+  <div class="card" style="text-align:center;padding:42px 20px;border:1px dashed var(--line);background:rgba(16,22,43,.45)">
+    <div style="font-size:36px;margin-bottom:12px">📄</div>
+    <h3 style="color:var(--tx);font-size:18px">PDF Specification Analyzer Ready</h3>
+    <p class="mut" style="max-width:560px;margin:8px auto 0;font-size:14px;line-height:1.5">Upload a technical specification, architecture document, or PRD above (or click <b>"⚡ Sample Tech Spec"</b>) and click <b>"Analyze PDF"</b> to extract requirements, evaluate technical risks, and generate an AI-driven quality report.</p>
+  </div>
+</div>`,
 history:()=>head('Analysis History','Everything you have analyzed, newest first.')+`<div class="card" id="history-box">${empty('No analyses yet. Run one and it will be listed here.')}</div>`,
 reports:()=>head('Generated Reports','Quality scores, findings and documentation.')+`<div class="grid g3"><div class="card"><h3>Overall quality score</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">Not calculated</p><p>Shown only after an analysis computes one.</p></div><div class="card"><h3>Issues detected</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">–</p></div><div class="card"><h3>Security findings</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">–</p></div></div><div class="card mt"><h3 style="margin-bottom:12px">Reports</h3>${empty('No reports generated yet.')}</div>`,
 'app-settings':()=>head('Settings','Preferences for this workspace.')+`<div class="card" style="max-width:640px"><div class="sw"><span>Calm mode<br><small class="mut">Turns off background drift and glow animations</small></span><input type="checkbox" id="calm" ${document.body.classList.contains('calm')?'checked':''}></div><p class="mut mt">API keys and connections are managed by your backend and are never stored in this page.</p></div>`};
@@ -1363,6 +1407,440 @@ function renderGithubOutput(data, scrollIntoView = true) {
   }
 }
 
+let LAST_PDF_DATA = null;
+let PDF_FILTERS = { sev: 'ALL', cat: 'ALL' };
+
+function setPdfFilter(key, val) {
+  PDF_FILTERS[key] = val;
+  if (LAST_PDF_DATA) renderPdfOutput(LAST_PDF_DATA, false);
+}
+
+function filterPdfTraceability(q) {
+  const query = (q || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('.pdf-trace-card');
+  rows.forEach(r => {
+    const text = (r.textContent || '').toLowerCase();
+    r.style.display = (!query || text.includes(query)) ? '' : 'none';
+  });
+}
+
+function downloadPdfJsonReport() {
+  if (!LAST_PDF_DATA) return toast('No PDF analysis data to download.');
+  const jsonStr = JSON.stringify(LAST_PDF_DATA, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const safeName = (LAST_PDF_DATA.input_name || 'specification').replace(/\.pdf$/i, '');
+  a.download = `${safeName}_analysis_report.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('JSON report downloaded successfully!');
+}
+
+function exportPdfAnalysisReport() {
+  if (!LAST_PDF_DATA) return toast('No analysis to export.');
+  window.print();
+}
+
+function renderPdfOutput(data, scrollIntoView = true) {
+  LAST_PDF_DATA = data;
+  const el = $('#pdf-results');
+  if (!el) return;
+
+  const meta = data.document_metadata || {};
+  const qs = data.quality_score || {};
+  const score = qs.overall_score || 0;
+  const level = qs.quality_level || 'Good';
+  const scoreDesc = qs.description || '';
+  const catScores = qs.category_scores || {};
+  const strengths = qs.strengths || [];
+  const weaknesses = qs.weaknesses || [];
+
+  const specs = data.extracted_specifications || {};
+  const tm = data.traceability_matrix || [];
+  const findings = data.findings || [];
+  const gaps = data.missing_gaps || [];
+  const ai = data.ai_insights || {};
+
+  const critCount = findings.filter(f => f.severity === 'Critical').length;
+  const warnCount = findings.filter(f => f.severity === 'Warning').length;
+  const infoCount = findings.filter(f => f.severity === 'Informational').length;
+  const passCount = findings.filter(f => f.severity === 'Passed').length;
+
+  const scoreColor = score >= 85 ? 'var(--grn)' : (score >= 70 ? 'var(--blu)' : (score >= 50 ? 'var(--amb)' : 'var(--red)'));
+  const scoreDisplay = `${score}<span style="font-size:14px;color:var(--mut)">/100</span>`;
+
+  // Filter Findings
+  const filteredFindings = findings.filter(f => {
+    if (PDF_FILTERS.sev !== 'ALL' && f.severity !== PDF_FILTERS.sev) return false;
+    return true;
+  });
+
+  // Category labels for Extracted Specifications
+  const specCategories = [
+    { key: 'functional_requirements', name: 'Functional Requirements', icon: '⚡' },
+    { key: 'non_functional_requirements', name: 'Non-Functional Requirements & SLAs', icon: '⏱️' },
+    { key: 'architecture', name: 'System Architecture & Modular Design', icon: '🏗️' },
+    { key: 'tech_stack', name: 'Technology Stack & Infrastructure', icon: '💻' },
+    { key: 'api_integrations', name: 'APIs & Integration Endpoints', icon: '🔌' },
+    { key: 'database', name: 'Database Schemas & Data Modeling', icon: '🗄️' },
+    { key: 'performance', name: 'Performance & Latency Budgets', icon: '📊' },
+    { key: 'security', name: 'Security & Compliance Protocol', icon: '🔒' },
+    { key: 'constraints', name: 'Constraints, Dependencies & Deployment', icon: '📦' },
+  ];
+
+  let specSectionsHtml = specCategories.map(cat => {
+    const items = specs[cat.key] || [];
+    if (!items.length) return '';
+    return `
+      <div style="margin-bottom:18px">
+        <div class="row sp" style="align-items:center;margin-bottom:8px">
+          <b style="color:var(--l);font-size:13.5px">${cat.icon} ${cat.name} (${items.length})</b>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${items.map(item => `
+            <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:8px;padding:12px 14px">
+              <div class="row sp" style="align-items:flex-start;margin-bottom:4px">
+                <b style="color:var(--tx);font-size:13px">${escapeHtml(item.title || 'Specification Block')}</b>
+                <span class="chip c-b" style="font-size:10.5px">📄 Page ${item.page || 1}</span>
+              </div>
+              <p class="mut" style="font-size:12.5px;line-height:1.55;margin:0">${escapeHtml(item.text || '')}</p>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).filter(Boolean).join('');
+
+  if (!specSectionsHtml) {
+    specSectionsHtml = `<div class="empty">No discrete specification blocks categorized. Text content extracted directly from document.</div>`;
+  }
+
+  // 4. Risk Findings HTML
+  const findingsHtml = filteredFindings.length === 0 ? `
+    <div style="padding:16px 20px;background:rgba(74,222,128,.04);border:1px dashed rgba(74,222,128,.2);border-radius:10px;color:var(--grn);font-size:13.5px">
+      ✅ No risk findings matching active filter criteria.
+    </div>
+  ` : filteredFindings.map(f => {
+    const sev = f.severity || 'Informational';
+    const chipClass = sev === 'Critical' ? 'c-r' : (sev === 'Warning' ? 'c-a' : (sev === 'Passed' ? 'c-g' : 'c-b'));
+    return `
+      <div style="margin-bottom:12px;background:rgba(8,11,26,.7);border:1px solid rgba(196,181,253,.2);border-radius:10px;padding:14px">
+        <div class="row sp" style="align-items:flex-start;margin-bottom:6px">
+          <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="chip ${chipClass}" style="font-size:11px;font-weight:700">${escapeHtml(sev.toUpperCase())}</span>
+            <b style="color:var(--tx);font-size:14px">${escapeHtml(f.title || 'Risk Finding')}</b>
+          </div>
+          <span class="chip c-b" style="font-size:11px">${escapeHtml(f.source_page || 'Doc')}</span>
+        </div>
+        <p class="mut" style="font-size:13px;line-height:1.5;margin:0 0 8px">${escapeHtml(f.description || '')}</p>
+        ${f.why_it_matters ? `
+          <div style="font-size:12px;color:var(--l);margin-bottom:6px;line-height:1.5">
+            <b>Why It Matters:</b> ${escapeHtml(f.why_it_matters)}
+          </div>
+        ` : ''}
+        ${f.recommended_action ? `
+          <div style="font-size:12px;color:var(--grn);background:rgba(74,222,128,.06);border-left:3px solid var(--grn);padding:6px 10px;border-radius:0 6px 6px 0">
+            <b>Recommended Action:</b> ${escapeHtml(f.recommended_action)}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
+  // 5. Missing Gaps HTML
+  const gapsHtml = gaps.length === 0 ? `
+    <div style="padding:16px 20px;background:rgba(74,222,128,.04);border:1px dashed rgba(74,222,128,.2);border-radius:10px;color:var(--grn);font-size:13.5px">
+      ✅ No critical requirement gaps detected in this specification.
+    </div>
+  ` : gaps.map(g => {
+    const sev = g.severity || 'Warning';
+    const chipClass = sev === 'Critical' ? 'c-r' : (sev === 'Warning' ? 'c-a' : 'c-b');
+    return `
+      <div style="margin-bottom:12px;background:rgba(8,11,26,.7);border:1px solid rgba(196,181,253,.2);border-radius:10px;padding:14px">
+        <div class="row sp" style="align-items:flex-start;margin-bottom:6px">
+          <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="chip ${chipClass}" style="font-size:11px;font-weight:700">${escapeHtml(sev.toUpperCase())}</span>
+            <b style="color:var(--tx);font-size:14px">${escapeHtml(g.issue || 'Specification Gap')}</b>
+          </div>
+          ${g.related_requirement ? `<span class="chip c-b" style="font-size:10.5px">${escapeHtml(g.related_requirement)}</span>` : ''}
+        </div>
+        <p class="mut" style="font-size:13px;line-height:1.5;margin:0 0 8px">${escapeHtml(g.explanation || '')}</p>
+        <div style="font-size:12px;color:var(--blu);background:rgba(59,130,246,.08);border-left:3px solid var(--b);padding:6px 10px;border-radius:0 6px 6px 0">
+          <b>Suggested Improvement:</b> ${escapeHtml(g.suggested_improvement || '')}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // 6. Traceability Cards HTML
+  const traceHtml = tm.length === 0 ? `
+    <div class="empty">No individual requirement IDs identified for traceability matrix.</div>
+  ` : `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:10px">
+      ${tm.map(r => {
+        const pri = (r.priority || 'Medium').toLowerCase();
+        const priChip = pri === 'high' ? 'c-r' : (pri === 'medium' ? 'c-a' : 'c-b');
+        return `
+          <div class="pdf-trace-card" style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:8px;padding:12px">
+            <div class="row sp" style="margin-bottom:6px">
+              <span class="chip c-b" style="font-size:11px;font-weight:700">${escapeHtml(r.req_id)}</span>
+              <div class="row" style="gap:6px">
+                <span class="chip ${priChip}" style="font-size:10px">${escapeHtml(r.priority || 'Med')}</span>
+                <span class="chip c-g" style="font-size:10px">📄 Page ${r.source_page || 1}</span>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--l);font-weight:600;margin-bottom:4px">${escapeHtml(r.category || 'General')}</div>
+            <p class="mut" style="font-size:12px;line-height:1.5;margin:0">${escapeHtml(r.description || '')}</p>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  // Render Full Results Assembly
+  el.innerHTML = `
+    <!-- Top Summary Banner -->
+    <div class="card mt" style="background:linear-gradient(135deg,rgba(139,92,246,.2),rgba(59,130,246,.12));border:1px solid rgba(196,181,253,.3);margin-bottom:18px">
+      <div class="row sp" style="align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+        <div class="row" style="gap:10px;align-items:center">
+          <span style="font-size:26px">📑</span>
+          <div>
+            <h2 style="font-size:22px;margin:0">${escapeHtml(data.input_name || 'Technical Specification')}</h2>
+            <div class="mut" style="font-size:12.5px;margin-top:2px">TechSpecAnalyser Specification Intelligence · Analysis ID: ${escapeHtml(data.analysis_id || 'COMPLETED')}</div>
+          </div>
+        </div>
+        <div class="row" style="gap:8px">
+          <button type="button" class="btn ghost" onclick="exportPdfAnalysisReport()" style="padding:8px 16px;animation:none">📄 Export PDF Report</button>
+          <button type="button" class="btn ghost" onclick="downloadPdfJsonReport()" style="padding:8px 16px;animation:none">💾 Download JSON</button>
+        </div>
+      </div>
+
+      <!-- Summary Metrics Grid -->
+      <div class="grid g4 mt" style="gap:10px">
+        <div style="background:rgba(8,11,26,.6);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
+          <small class="mut">Document Scope</small>
+          <div style="font-size:20px;font-weight:700;color:var(--tx);margin-top:2px">${meta.page_count || 1} Page(s)</div>
+          <small class="mut" style="font-size:11px">${meta.total_words || 0} words extracted</small>
+        </div>
+        <div style="background:rgba(8,11,26,.6);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
+          <small class="mut">Traceable Requirements</small>
+          <div style="font-size:20px;font-weight:700;color:var(--l);margin-top:2px">${tm.length} Req(s)</div>
+          <small class="mut" style="font-size:11px">Mapped to source pages</small>
+        </div>
+        <div style="background:rgba(8,11,26,.6);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
+          <small class="mut">Risk Findings & Gaps</small>
+          <div class="row" style="gap:5px;margin-top:4px">
+            <span class="chip c-r" style="font-size:10px">Crit: ${critCount}</span>
+            <span class="chip c-a" style="font-size:10px">Warn: ${warnCount}</span>
+            <span class="chip c-b" style="font-size:10px">Gaps: ${gaps.length}</span>
+          </div>
+          <small class="mut" style="font-size:11px;margin-top:4px;display:inline-block">${findings.length} total checks evaluated</small>
+        </div>
+        <div style="background:rgba(8,11,26,.6);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
+          <small class="mut">Specification Quality Score</small>
+          <div style="font-size:22px;font-weight:700;color:${scoreColor};margin-top:2px">
+            ${scoreDisplay}
+          </div>
+          <span class="chip c-g" style="font-size:10px;margin-top:2px">${escapeHtml(level)}</span>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:var(--mut);margin-top:12px;line-height:1.5">
+        ℹ️ <b>Quality Score Index:</b> Evaluated across 8 dimensions (Completeness, Clarity, Consistency, Security, Performance, Architecture, Testability, Constraints). Level: <b>${escapeHtml(level)}</b>.
+      </div>
+    </div>
+
+    <!-- Detailed Specification Quality Score Card -->
+    <div class="card mt" style="background:rgba(16,22,43,.75);border:1px solid var(--line);margin-bottom:18px">
+      <div class="row sp" style="align-items:center;margin-bottom:12px">
+        <div>
+          <h3 style="font-size:16px;margin:0">Specification Quality Score (0–100)</h3>
+          <p class="mut" style="font-size:12.5px;margin:2px 0 0">${escapeHtml(scoreDesc)}</p>
+        </div>
+        <span class="chip c-b" style="font-size:12px;font-weight:700">${score}/100 · ${escapeHtml(level.toUpperCase())}</span>
+      </div>
+
+      <!-- 8 Dimension Bars -->
+      <div class="grid g4" style="gap:10px;margin-bottom:14px">
+        ${Object.entries(catScores).map(([k, v]) => `
+          <div style="background:rgba(8,11,26,.6);padding:10px 12px;border-radius:8px;border:1px solid rgba(196,181,253,.12)">
+            <div class="row sp" style="font-size:11.5px;margin-bottom:4px">
+              <span class="mut" style="text-transform:capitalize">${k}</span>
+              <b style="color:var(--tx)">${v}/100</b>
+            </div>
+            <div style="height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:${v}%;background:linear-gradient(90deg,var(--b),var(--v))"></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Strengths & Weaknesses Grid -->
+      <div class="grid g2" style="gap:12px">
+        <div style="background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:12px">
+          <b style="color:var(--grn);font-size:12.5px">✨ Documented Strengths:</b>
+          <ul style="margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--tx);line-height:1.6">
+            ${strengths.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+          </ul>
+        </div>
+        <div style="background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.2);border-radius:8px;padding:12px">
+          <b style="color:var(--amb);font-size:12.5px">⚠️ Key Areas for Refinement:</b>
+          <ul style="margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--tx);line-height:1.6">
+            ${weaknesses.map(w => `<li>${escapeHtml(w)}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- The 6 Expandable Result Sections -->
+    <!-- 1. Executive Summary & Architecture Overview -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">1. Executive Summary & Technical Overview</b>
+          <span class="chip c-b" style="font-size:12px">${escapeHtml(ai.model || 'Specification Intelligence')}</span>
+        </div>
+        <span class="chip c-g">READY</span>
+      </summary>
+      <div style="padding:16px 20px 20px">
+        <div style="background:rgba(139,92,246,.08);border:1px solid rgba(196,181,253,.25);border-radius:10px;padding:14px;margin-bottom:14px">
+          <b style="color:var(--l);font-size:13.5px">📋 Executive Summary</b>
+          <p style="color:var(--tx);font-size:13.5px;line-height:1.6;margin:6px 0 0">${escapeHtml(ai.executive_summary || 'Analysis completed.')}</p>
+        </div>
+        <div style="margin-bottom:14px">
+          <b style="color:var(--tx);font-size:13.5px">🔍 Key Technical Observations:</b>
+          <ul style="margin:8px 0 0;padding-left:20px;font-size:13px;color:var(--mut);line-height:1.65">
+            ${(ai.key_observations || []).map(obs => `<li><span class="chip c-b" style="font-size:10px;margin-right:6px">Explicit</span>${escapeHtml(obs)}</li>`).join('')}
+          </ul>
+        </div>
+        <div class="grid g2" style="gap:12px">
+          <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:10px;padding:12px">
+            <h4 style="font-size:13px;color:var(--grn);margin:0 0 6px">Requirement Clarity Assessment</h4>
+            <p class="mut" style="font-size:12.5px;margin:0;line-height:1.5">${escapeHtml((ai.clarity_assessment && ai.clarity_assessment.detail) || 'Requirements defined.')}</p>
+          </div>
+          <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:10px;padding:12px">
+            <h4 style="font-size:13px;color:var(--amb);margin:0 0 6px">Technical Feasibility Concerns</h4>
+            <p class="mut" style="font-size:12.5px;margin:0;line-height:1.5">${escapeHtml((ai.feasibility_concerns && ai.feasibility_concerns[0]) || 'Standard design.')}</p>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <!-- 2. Extracted Technical Specifications -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">2. Extracted Technical Specifications</b>
+          <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);border-color:rgba(196,181,253,.25);color:var(--l)">Categorized with Page Refs</span>
+        </div>
+        <span class="chip c-g">EXTRACTED</span>
+      </summary>
+      <div style="padding:16px 20px 20px">${specSectionsHtml}</div>
+    </details>
+
+    <!-- 3. AI-Generated Insights & Recommendations -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">3. AI-Generated Insights & Recommendations</b>
+          <span class="chip c-b" style="font-size:12px">${(ai.recommendations || []).length} Strategic Action(s)</span>
+        </div>
+        <span class="chip c-b">ACTIONABLE</span>
+      </summary>
+      <div style="padding:16px 20px 20px">
+        ${(ai.recommendations || []).map(r => {
+          const pri = (r.priority || 'Medium').toLowerCase();
+          const priChip = pri === 'high' ? 'c-r' : (pri === 'medium' ? 'c-a' : 'c-b');
+          return `
+            <div style="margin-bottom:12px;background:rgba(8,11,26,.7);border:1px solid rgba(196,181,253,.2);border-radius:10px;padding:14px">
+              <div class="row sp" style="align-items:flex-start;margin-bottom:6px">
+                <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+                  <span class="chip ${priChip}" style="font-size:11px;font-weight:700">${escapeHtml((r.priority || 'MEDIUM').toUpperCase())}</span>
+                  <b style="color:var(--tx);font-size:14px">${escapeHtml(r.title || 'Recommendation')}</b>
+                </div>
+                <span class="chip c-b" style="font-size:11px">${escapeHtml(r.category || 'Architecture')}</span>
+              </div>
+              <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(r.detail || '')}</p>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </details>
+
+    <!-- 4. Risk & Severity Analysis -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">4. Risk & Severity Analysis</b>
+          <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);border-color:rgba(196,181,253,.25);color:var(--l)">${findings.length} Evaluation(s)</span>
+        </div>
+        <div class="row" style="gap:8px">
+          ${critCount ? '<span class="chip c-r">CRITICAL</span>' : (warnCount ? '<span class="chip c-a">WARNING</span>' : '<span class="chip c-g">PASSED</span>')}
+        </div>
+      </summary>
+      <div style="padding:16px 20px 20px">
+        <div class="row sp" style="align-items:center;padding:8px 12px;background:rgba(8,11,26,.6);border:1px solid var(--line);border-radius:8px;margin-bottom:12px;font-size:12px;flex-wrap:wrap;gap:8px">
+          <div class="row" style="gap:8px;align-items:center">
+            <span style="font-weight:600;color:var(--tx)">Filter Severity:</span>
+            <select style="width:auto;padding:3px 8px;font-size:11.5px;height:26px" onchange="setPdfFilter('sev', this.value)" aria-label="Filter Severity">
+              <option value="ALL" ${PDF_FILTERS.sev === 'ALL' ? 'selected' : ''}>All Severities (${findings.length})</option>
+              <option value="Critical" ${PDF_FILTERS.sev === 'Critical' ? 'selected' : ''}>Critical (${critCount})</option>
+              <option value="Warning" ${PDF_FILTERS.sev === 'Warning' ? 'selected' : ''}>Warning (${warnCount})</option>
+              <option value="Informational" ${PDF_FILTERS.sev === 'Informational' ? 'selected' : ''}>Informational (${infoCount})</option>
+              <option value="Passed" ${PDF_FILTERS.sev === 'Passed' ? 'selected' : ''}>Passed (${passCount})</option>
+            </select>
+          </div>
+          <div class="row" style="gap:6px">
+            <span class="chip c-r" style="font-size:10px">Crit: ${critCount}</span>
+            <span class="chip c-a" style="font-size:10px">Warn: ${warnCount}</span>
+            <span class="chip c-b" style="font-size:10px">Info: ${infoCount}</span>
+            <span class="chip c-g" style="font-size:10px">Pass: ${passCount}</span>
+          </div>
+        </div>
+        <div>${findingsHtml}</div>
+      </div>
+    </details>
+
+    <!-- 5. Missing Requirements & Gap Detection -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">5. Missing Requirements & Gap Detection</b>
+          <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);border-color:rgba(196,181,253,.25);color:var(--l)">${gaps.length} Gap(s) Identified</span>
+        </div>
+        <span class="chip ${gaps.length ? 'c-a' : 'c-g'}">${gaps.length ? 'GAPS DETECTED' : 'COMPLETE'}</span>
+      </summary>
+      <div style="padding:16px 20px 20px">${gapsHtml}</div>
+    </details>
+
+    <!-- 6. Requirement Traceability Matrix -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">6. Requirement Traceability Matrix</b>
+          <span class="chip c-b" style="font-size:12px">${tm.length} Mapped Requirement(s)</span>
+        </div>
+        <span class="chip c-g">TRACEABLE</span>
+      </summary>
+      <div style="padding:16px 20px 20px">
+        <div class="row sp" style="align-items:center;margin-bottom:12px;gap:10px">
+          <input type="text" placeholder="Search requirements, categories, or keywords..." style="padding:6px 12px;font-size:12.5px;flex:1;max-width:380px" oninput="filterPdfTraceability(this.value)">
+          <span class="mut" style="font-size:12px">${tm.length} requirement(s) tracked back to source PDF pages</span>
+        </div>
+        <div>${traceHtml}</div>
+      </div>
+    </details>
+  `;
+
+  if (scrollIntoView) {
+    setTimeout(() => el.scrollIntoView({ behavior: 'smooth' }), 100);
+  }
+}
+
 function bind(k){
   const an=$('#an');
   if(k=='code-analysis'){
@@ -1522,17 +2000,159 @@ if(k=='github-review'){
     };
   }
   if(k=='pdf-analysis'){
-    const dz=$('#dz'),pf=$('#pf');
-    const show=f=>{
-      if(!f||f.type!='application/pdf')return toast('Please choose a PDF file.');
-      $('#pi').innerHTML=`<span class="chip c-b">${f.name.replace(/[<>&]/g,'')} · ${(f.size/1024).toFixed(0)} KB</span>`;
-      toast('Document ready');
+    const dz=$('#drop-zone'), pf=$('#pf');
+    const infoBar=$('#file-info-bar'), fName=$('#file-name'), fSize=$('#file-size');
+    const clearBtn=$('#pdf-clear'), sampleBtn=$('#pdf-sample-btn'), hint=$('#pdf-hint');
+    let selectedFile = null;
+
+    const selectFile = (file) => {
+      if(!file) return;
+      if(!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
+        return toast('Please select a valid PDF (.pdf) file.');
+      }
+      if(file.size > 20 * 1024 * 1024) {
+        return toast('File exceeds the 20MB limit for PDF specifications.');
+      }
+      selectedFile = file;
+      fName.textContent = file.name;
+      fSize.textContent = (file.size < 1024*1024 ? (file.size/1024).toFixed(1) + ' KB' : (file.size/(1024*1024)).toFixed(2) + ' MB') + ' · Ready for Analysis';
+      infoBar.style.display = 'flex';
+      hint.textContent = 'File selected. Click "Analyze PDF" to proceed.';
+      toast('Selected ' + file.name);
     };
-    pf.onchange=e=>show(e.target.files[0]);
-    ['dragenter','dragover'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.add('over')}));
-    ['dragleave','drop'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.remove('over')}));
-    dz.addEventListener('drop',e=>show(e.dataTransfer.files[0]));
-    an.onclick=()=>{if(!$('#pi').innerHTML)return toast('Upload a PDF first.');runDemo(an,'#pg','PDF Analysis');};
+
+    const clearFile = () => {
+      selectedFile = null;
+      pf.value = '';
+      infoBar.style.display = 'none';
+      hint.textContent = 'Select or drop a PDF document to begin analysis';
+    };
+
+    if(clearBtn) clearBtn.onclick = clearFile;
+
+    if(dz) {
+      dz.onclick = () => pf.click();
+      ['dragenter','dragover'].forEach(v => dz.addEventListener(v, e => { e.preventDefault(); dz.style.borderColor='var(--v)'; dz.style.background='rgba(139,92,246,.12)'; }));
+      ['dragleave','drop'].forEach(v => dz.addEventListener(v, e => { e.preventDefault(); dz.style.borderColor=''; dz.style.background=''; }));
+      dz.addEventListener('drop', e => {
+        if(e.dataTransfer.files && e.dataTransfer.files.length) {
+          selectFile(e.dataTransfer.files[0]);
+        }
+      });
+    }
+
+    if(pf) {
+      pf.onchange = e => {
+        if(e.target.files && e.target.files.length) {
+          selectFile(e.target.files[0]);
+        }
+      };
+    }
+
+    // Sample Spec Button
+    if(sampleBtn) {
+      sampleBtn.onclick = async () => {
+        if(an.classList.contains('busy')) return;
+        an.classList.add('busy');
+        const p=$('#pg');
+        const pStatus=$('#pg-status');
+        const pText=$('#pg-text');
+        if(p) p.style.display='block';
+        if(pStatus) pStatus.style.display='flex';
+
+        const updateProgress=(pct, text)=>{
+          if(p && p.firstElementChild) p.firstElementChild.style.width=pct+'%';
+          if(pText) pText.textContent=text;
+        };
+
+        updateProgress(15, 'Loading sample enterprise technical specification...');
+        const timer1=setTimeout(()=>updateProgress(35, 'Extracting text & preserving page numbers...'), 600);
+        const timer2=setTimeout(()=>updateProgress(55, 'Identifying technical specifications & requirements...'), 1400);
+        const timer3=setTimeout(()=>updateProgress(75, 'Evaluating risks, architecture & missing gaps...'), 2400);
+        const timer4=setTimeout(()=>updateProgress(90, 'Synthesizing AI insights & computing quality score...'), 3500);
+
+        try {
+          const res = await fetch('/api/analysis/pdf/sample', { method: 'POST' });
+          clearTimeout(timer1); clearTimeout(timer2); clearTimeout(timer3); clearTimeout(timer4);
+          if(!res.ok) {
+            const errData = await res.json().catch(() => ({ detail: 'HTTP ' + res.status }));
+            throw new Error(errData.detail || 'Sample PDF analysis failed.');
+          }
+          updateProgress(100, 'Analysis finalized successfully!');
+          const data = await res.json();
+          setTimeout(() => {
+            if(p) p.style.display='none';
+            if(pStatus) pStatus.style.display='none';
+          }, 400);
+          an.classList.remove('busy');
+          renderPdfOutput(data);
+          toast('Sample technical specification analyzed!');
+        } catch(err) {
+          clearTimeout(timer1); clearTimeout(timer2); clearTimeout(timer3); clearTimeout(timer4);
+          an.classList.remove('busy');
+          if(p) p.style.display='none';
+          if(pStatus) pStatus.style.display='none';
+          toast('Error: ' + err.message);
+        }
+      };
+    }
+
+    // Analyze PDF Button
+    an.onclick = async () => {
+      if(!selectedFile) {
+        return toast('Please select or drop a PDF file first.');
+      }
+      if(an.classList.contains('busy')) return;
+      an.classList.add('busy');
+
+      const p=$('#pg');
+      const pStatus=$('#pg-status');
+      const pText=$('#pg-text');
+      if(p) p.style.display='block';
+      if(pStatus) pStatus.style.display='flex';
+
+      const updateProgress=(pct, text)=>{
+        if(p && p.firstElementChild) p.firstElementChild.style.width=pct+'%';
+        if(pText) pText.textContent=text;
+      };
+
+      updateProgress(15, 'Uploading document...');
+      const timer1=setTimeout(()=>updateProgress(35, 'Extracting text & preserving page numbers...'), 800);
+      const timer2=setTimeout(()=>updateProgress(55, 'Identifying technical specifications & requirements...'), 2000);
+      const timer3=setTimeout(()=>updateProgress(75, 'Evaluating risks, architecture & missing gaps...'), 3600);
+      const timer4=setTimeout(()=>updateProgress(90, 'Synthesizing AI insights & computing quality score...'), 5200);
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      try {
+        const res = await fetch('/api/analysis/pdf', {
+          method: 'POST',
+          body: formData
+        });
+        clearTimeout(timer1); clearTimeout(timer2); clearTimeout(timer3); clearTimeout(timer4);
+        if(!res.ok) {
+          const errData = await res.json().catch(() => ({ detail: 'HTTP ' + res.status }));
+          const errMsg = (errData.error && errData.error.message) ? errData.error.message : (errData.detail || 'Analysis failed.');
+          throw new Error(errMsg);
+        }
+        updateProgress(100, 'Analysis finalized successfully!');
+        const data = await res.json();
+        setTimeout(() => {
+          if(p) p.style.display='none';
+          if(pStatus) pStatus.style.display='none';
+        }, 400);
+        an.classList.remove('busy');
+        renderPdfOutput(data);
+        toast('PDF specification analysis completed!');
+      } catch(err) {
+        clearTimeout(timer1); clearTimeout(timer2); clearTimeout(timer3); clearTimeout(timer4);
+        an.classList.remove('busy');
+        if(p) p.style.display='none';
+        if(pStatus) pStatus.style.display='none';
+        toast('Error: ' + err.message);
+      }
+    };
   }
   if(k=='app-settings')$('#calm').onchange=e=>{document.body.classList.toggle('calm',e.target.checked);toast(e.target.checked?'Calm mode on':'Calm mode off')};
 }
