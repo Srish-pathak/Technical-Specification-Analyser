@@ -94,6 +94,40 @@ def download_sample_pdf():
     )
 
 
+@router.get("/pdf/{analysis_id}/report")
+async def export_pdf_analysis_report(analysis_id: str):
+    db = get_db()
+    rec = db.get(analysis_id)
+    if not rec:
+        raise HTTPException(status_code=404, detail="Analysis record not found.")
+
+    report_pdf_bytes = await run_in_threadpool(pdf_svc.generate_analysis_report_pdf, rec)
+    safe_name = rec.get("input_name", "analysis").replace(".pdf", "").replace(" ", "_")
+    return Response(
+        content=report_pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="TechSpec_Report_{safe_name}.pdf"'
+        },
+    )
+
+
+@router.post("/pdf/sample-unsupported")
+@router.get("/pdf/sample-unsupported")
+async def analyze_sample_unsupported_pdf():
+    s = get_settings()
+    db = get_db()
+    sample_bytes = pdf_svc.generate_sample_unsupported_pdf_bytes()
+    result = await run_in_threadpool(
+        pdf_svc.process_and_analyze_pdf,
+        sample_bytes,
+        "Artisanal_Sourdough_Guide_NonTechnical.pdf",
+        s,
+    )
+    db.save(result)
+    return result
+
+
 @router.get("/{analysis_id}")
 def get_analysis(analysis_id: str):
     rec: Optional[dict] = get_db().get(analysis_id)

@@ -121,6 +121,42 @@ class TestPdfService(unittest.TestCase):
         self.assertGreater(len(resp.body), 1000)
         self.assertTrue(resp.body.startswith(b"%PDF"))
 
+    def test_unsupported_non_technical_document_rejection(self):
+        """Verify that a non-software/non-engineering PDF is identified as unsupported without fake data."""
+        unsupported_bytes = pdf_service.generate_sample_unsupported_pdf_bytes()
+        result = pdf_service.process_and_analyze_pdf(unsupported_bytes, "Baking_Guide.pdf")
+
+        self.assertEqual(result["status"], "unsupported")
+        self.assertFalse(result["is_software_engineering_doc"])
+        self.assertEqual(result["document_type"], "unsupported_non_technical")
+        self.assertIsNotNone(result["rejection_reason"])
+        self.assertIn("not appear to be a software", result["rejection_reason"].lower())
+        # Ensure no hallucinated / fabricated requirements
+        self.assertEqual(len(result["extracted_specifications"]), 0)
+        self.assertEqual(len(result["traceability_matrix"]), 0)
+        self.assertEqual(len(result["findings"]), 0)
+
+    def test_generate_analysis_report_pdf(self):
+        """Verify that generate_analysis_report_pdf outputs a valid multi-page PDF."""
+        sample_bytes = pdf_service.generate_sample_pdf_bytes()
+        result = pdf_service.process_and_analyze_pdf(sample_bytes, "Analytics_SRS.pdf")
+        report_pdf_bytes = pdf_service.generate_analysis_report_pdf(result)
+
+        self.assertGreater(len(report_pdf_bytes), 2000)
+        self.assertTrue(report_pdf_bytes.startswith(b"%PDF"))
+
+    def test_pdf_report_generation_for_database_record(self):
+        """Verify that generate_analysis_report_pdf works on database-persisted records."""
+        sample_bytes = pdf_service.generate_sample_pdf_bytes()
+        result = pdf_service.process_and_analyze_pdf(sample_bytes, "Audit_Target.pdf")
+        self.db.save(result)
+
+        saved_rec = self.db.get(result["analysis_id"])
+        self.assertIsNotNone(saved_rec)
+        report_bytes = pdf_service.generate_analysis_report_pdf(saved_rec)
+        self.assertGreater(len(report_bytes), 2000)
+        self.assertTrue(report_bytes.startswith(b"%PDF"))
+
 
 if __name__ == "__main__":
     unittest.main()

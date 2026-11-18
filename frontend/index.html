@@ -192,12 +192,26 @@ def calculate_score(user_query):
   </div>
 </div>`,
 
-'pdf-analysis':()=>head('PDF Technical Specification Analyzer','Upload or drag-and-drop a technical specification PDF to extract architecture, verify requirements, evaluate risks, and compute specification quality score.')+`
+'pdf-analysis':()=>head('PDF Technical Specification Analyzer','AI-powered technical specification analysis for SRS, SDD, Architecture, Database Design, API documentation, and Software Project Reports.')+`
 <div class="card">
+  <!-- Supported Engineering Document Types Banner -->
+  <div style="margin-bottom:14px;padding:10px 14px;background:rgba(8,11,26,.65);border:1px solid rgba(196,181,253,.15);border-radius:10px;font-size:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="font-weight:600;color:var(--l)">Supported Engineering Documents:</span>
+    <span class="chip c-b" style="font-size:10px">📋 SRS</span>
+    <span class="chip c-b" style="font-size:10px">⚙️ Tech Spec</span>
+    <span class="chip c-b" style="font-size:10px">📐 SDD</span>
+    <span class="chip c-b" style="font-size:10px">🏛️ Architecture</span>
+    <span class="chip c-b" style="font-size:10px">🗄️ Database Design</span>
+    <span class="chip c-b" style="font-size:10px">🔌 API Docs</span>
+    <span class="chip c-b" style="font-size:10px">💡 Proposals</span>
+    <span class="chip c-b" style="font-size:10px">📊 Project Reports</span>
+    <span class="chip c-b" style="font-size:10px">🔄 UML Design</span>
+  </div>
+
   <div id="drop-zone" class="drop" style="display:block;cursor:pointer;transition:border-color .2s,background .2s;text-align:center;padding:32px 20px">
     <div class="ic" style="margin:0 auto 12px">${ic('pdf')}</div>
-    <b style="color:var(--tx);font-size:16px">Drag and drop a PDF technical specification here</b><br>
-    <span class="mut" style="font-size:13px">or click to browse files from your computer (PDF only, up to 20MB)</span>
+    <b style="color:var(--tx);font-size:16px">Drag and drop an engineering specification PDF here</b><br>
+    <span class="mut" style="font-size:13px">or click to browse files from your computer (SRS, SDD, Architecture, API, Database — up to 20MB)</span>
     <input id="pf" type="file" accept=".pdf,application/pdf" hidden>
   </div>
 
@@ -217,11 +231,12 @@ def calculate_score(user_query):
 
   <div class="row mt sp" style="align-items:center;flex-wrap:wrap;gap:10px">
     <div class="row" style="gap:10px;flex-wrap:wrap">
-      <button type="button" class="btn ghost" id="pdf-sample-btn" style="padding:10px 18px;animation:none">⚡ Sample Tech Spec</button>
+      <button type="button" class="btn ghost" id="pdf-sample-btn" style="padding:10px 18px;animation:none">⚡ Sample SRS Spec</button>
       <a href="/api/analysis/pdf/sample/download" download="TechSpecAnalyser_Sample_Specification.pdf" class="btn ghost" id="pdf-download-btn" style="padding:10px 18px;animation:none;text-decoration:none;display:inline-flex;align-items:center;gap:6px">📥 Download Sample PDF</a>
+      <button type="button" class="btn ghost" id="pdf-unsupported-btn" style="padding:10px 14px;animation:none;font-size:12px">🧪 Test Unsupported Doc</button>
       <button class="btn" id="an"><span class="spin"></span>Analyze PDF</button>
     </div>
-    <span class="mut" id="pdf-hint" style="font-size:12.5px">Select or drop a PDF document to begin analysis</span>
+    <span class="mut" id="pdf-hint" style="font-size:12.5px">Select or drop a technical PDF to begin analysis</span>
   </div>
 
   <div class="prog" id="pg" style="margin-top:14px;display:none"><i></i></div>
@@ -235,7 +250,7 @@ def calculate_score(user_query):
   <div class="card" style="text-align:center;padding:42px 20px;border:1px dashed var(--line);background:rgba(16,22,43,.45)">
     <div style="font-size:36px;margin-bottom:12px">📄</div>
     <h3 style="color:var(--tx);font-size:18px">PDF Specification Analyzer Ready</h3>
-    <p class="mut" style="max-width:560px;margin:8px auto 0;font-size:14px;line-height:1.5">Upload a technical specification, architecture document, or PRD above (or click <b>"⚡ Sample Tech Spec"</b>) and click <b>"Analyze PDF"</b> to extract requirements, evaluate technical risks, and generate an AI-driven quality report.</p>
+    <p class="mut" style="max-width:560px;margin:8px auto 0;font-size:14px;line-height:1.5">Upload a technical specification, architecture document, SRS, SDD, or API doc above (or click <b>"⚡ Sample SRS Spec"</b>) and click <b>"Analyze PDF"</b> to extract requirements, evaluate technical risks, and generate an AI-driven quality report.</p>
   </div>
 </div>`,
 history:()=>head('Analysis History','Everything you have analyzed, newest first.')+`<div class="card" id="history-box">${empty('No analyses yet. Run one and it will be listed here.')}</div>`,
@@ -1451,6 +1466,50 @@ function renderPdfOutput(data, scrollIntoView = true) {
   const el = $('#pdf-results');
   if (!el) return;
 
+  // Case 1: Unsupported / Non-Technical Document Handling
+  if (data.is_software_engineering_doc === false || data.status === 'unsupported') {
+    const meta = data.document_metadata || {};
+    el.innerHTML = `
+      <div class="card mt" style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.35);border-radius:12px;padding:24px;margin-bottom:18px">
+        <div class="row sp" style="align-items:flex-start;flex-wrap:wrap;gap:12px">
+          <div class="row" style="gap:12px;align-items:center">
+            <span style="font-size:32px">⚠️</span>
+            <div>
+              <span class="chip c-r" style="font-size:11px;font-weight:700">UNSUPPORTED DOCUMENT TYPE</span>
+              <h3 style="color:var(--tx);font-size:18px;margin:4px 0 2px">Non-Software / Non-Technical Document Detected</h3>
+              <div class="mut" style="font-size:13px">${escapeHtml(data.input_name || 'Uploaded Document')} · ${meta.page_count || 1} page(s) · ${meta.total_words || 0} words</div>
+            </div>
+          </div>
+          <span class="chip c-r" style="font-size:11px;padding:6px 12px">${escapeHtml(data.document_type_label || 'Non-Engineering Document')}</span>
+        </div>
+
+        <div style="background:rgba(8,11,26,.7);border:1px solid rgba(239,68,68,.25);border-radius:10px;padding:16px;margin:16px 0">
+          <b style="color:var(--tx);font-size:13.5px">Why was this document rejected?</b>
+          <p style="color:var(--mut);font-size:13px;line-height:1.6;margin:6px 0 10px">${escapeHtml(data.rejection_reason || 'The document does not describe software requirements, system architectures, API specifications, or engineering systems.')}</p>
+          <div style="font-size:12px;color:var(--l);line-height:1.5">
+            <b>Supported Types:</b> Software Requirements Specifications (SRS), Software Design Documents (SDD), System Architecture Documents, Database Designs, API Documentation, Technical Proposals, and Engineering Project Reports.
+          </div>
+        </div>
+
+        ${data.content_sample ? `
+          <div style="margin-top:14px">
+            <b class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.6px">Extracted Text Excerpt (Zero Hallucination Proof):</b>
+            <pre style="background:rgba(0,0,0,.5);border:1px solid var(--line);padding:12px;border-radius:8px;margin:6px 0 0;font-size:12px;color:var(--tx);white-space:pre-wrap;max-height:140px;overflow:auto">${escapeHtml(data.content_sample)}</pre>
+          </div>
+        ` : ''}
+
+        <div class="row mt" style="justify-content:flex-end">
+          <button type="button" class="btn" onclick="$('#pf').click()" style="animation:none">📂 Choose an Engineering Specification</button>
+        </div>
+      </div>
+    `;
+    if (scrollIntoView) {
+      setTimeout(() => el.scrollIntoView({ behavior: 'smooth' }), 100);
+    }
+    return;
+  }
+
+  // Case 2: Supported Software Engineering Document Analysis
   const meta = data.document_metadata || {};
   const qs = data.quality_score || {};
   const score = qs.overall_score || 0;
@@ -1480,7 +1539,7 @@ function renderPdfOutput(data, scrollIntoView = true) {
     return true;
   });
 
-  // Category labels for Extracted Specifications
+  // Section 2: Extracted Specifications Categories
   const specCategories = [
     { key: 'functional_requirements', name: 'Functional Requirements', icon: '⚡' },
     { key: 'non_functional_requirements', name: 'Non-Functional Requirements & SLAs', icon: '⏱️' },
@@ -1520,7 +1579,74 @@ function renderPdfOutput(data, scrollIntoView = true) {
     specSectionsHtml = `<div class="empty">No discrete specification blocks categorized. Text content extracted directly from document.</div>`;
   }
 
-  // 4. Risk Findings HTML
+  // Section 3: Functional & Non-Functional Breakdown HTML
+  const frList = specs.functional_requirements || [];
+  const nfrList = specs.non_functional_requirements || [];
+  let reqsBreakdownHtml = `
+    <div class="grid g2" style="gap:14px;margin-bottom:14px">
+      <div style="background:rgba(8,11,26,.65);border:1px solid rgba(196,181,253,.18);border-radius:10px;padding:14px">
+        <div class="row sp" style="margin-bottom:8px">
+          <b style="color:var(--l);font-size:13.5px">⚡ Functional Requirements (${frList.length})</b>
+          <span class="chip c-b" style="font-size:10px">Verifiable</span>
+        </div>
+        ${frList.length ? frList.slice(0, 6).map(f => `
+          <div style="padding:8px 10px;border-bottom:1px solid rgba(196,181,253,.1);font-size:12.5px">
+            <div class="row sp" style="margin-bottom:3px">
+              <b style="color:var(--tx);font-size:12px">${escapeHtml(f.title || 'Functional Requirement')}</b>
+              <span class="chip c-b" style="font-size:10px">p.${f.page || 1}</span>
+            </div>
+            <p class="mut" style="font-size:12px;margin:0;line-height:1.45">${escapeHtml(f.text || '')}</p>
+          </div>
+        `).join('') : '<div class="mut" style="font-size:12px">No functional requirements explicitly isolated.</div>'}
+      </div>
+      <div style="background:rgba(8,11,26,.65);border:1px solid rgba(196,181,253,.18);border-radius:10px;padding:14px">
+        <div class="row sp" style="margin-bottom:8px">
+          <b style="color:var(--grn);font-size:13.5px">⏱️ Non-Functional Requirements & SLAs (${nfrList.length})</b>
+          <span class="chip c-g" style="font-size:10px">SLAs / Reliability</span>
+        </div>
+        ${nfrList.length ? nfrList.slice(0, 6).map(n => `
+          <div style="padding:8px 10px;border-bottom:1px solid rgba(196,181,253,.1);font-size:12.5px">
+            <div class="row sp" style="margin-bottom:3px">
+              <b style="color:var(--tx);font-size:12px">${escapeHtml(n.title || 'Non-Functional Requirement')}</b>
+              <span class="chip c-g" style="font-size:10px">p.${n.page || 1}</span>
+            </div>
+            <p class="mut" style="font-size:12px;margin:0;line-height:1.45">${escapeHtml(n.text || '')}</p>
+          </div>
+        `).join('') : '<div class="mut" style="font-size:12px">No non-functional SLAs explicitly isolated.</div>'}
+      </div>
+    </div>
+  `;
+
+  // Section 4: Architecture & Tech Analysis HTML
+  const archBlocks = specs.architecture || [];
+  const modulesList = specs.modules || [];
+  const techStackList = specs.tech_stack || [];
+  let archAnalysisHtml = `
+    <div style="background:rgba(139,92,246,.06);border:1px solid rgba(196,181,253,.2);border-radius:10px;padding:14px;margin-bottom:14px">
+      <b style="color:var(--l);font-size:13px">🏛️ Architectural Pattern Evaluation:</b>
+      <p style="color:var(--tx);font-size:13px;line-height:1.6;margin:6px 0 0">${escapeHtml(ai.ai_architecture_evaluation || 'Architectural components demonstrate structured decomposition.')}</p>
+    </div>
+    <div class="grid g2" style="gap:12px;margin-bottom:10px">
+      <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:8px;padding:12px">
+        <b style="color:var(--tx);font-size:12.5px">Identified Architectural Components (${archBlocks.length + modulesList.length})</b>
+        <div style="margin-top:6px;display:flex;flex-direction:column;gap:6px">
+          ${(archBlocks.concat(modulesList)).slice(0, 4).map(a => `
+            <div style="font-size:12px;color:var(--mut)"><span class="chip c-b" style="font-size:9.5px;margin-right:6px">p.${a.page || 1}</span>${escapeHtml(a.title || a.text.slice(0, 60))}</div>
+          `).join('') || '<div class="mut" style="font-size:12px">Monolithic/generic architectural boundaries detected.</div>'}
+        </div>
+      </div>
+      <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:8px;padding:12px">
+        <b style="color:var(--tx);font-size:12.5px">Declared Technology Stack & Tools (${techStackList.length})</b>
+        <div style="margin-top:6px;display:flex;flex-direction:column;gap:6px">
+          ${techStackList.slice(0, 4).map(t => `
+            <div style="font-size:12px;color:var(--l)"><span class="chip c-g" style="font-size:9.5px;margin-right:6px">p.${t.page || 1}</span>${escapeHtml(t.title || t.text.slice(0, 60))}</div>
+          `).join('') || '<div class="mut" style="font-size:12px">Technology stack not explicitly enumerated.</div>'}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Section 5: Risk & Severity Analysis HTML
   const findingsHtml = filteredFindings.length === 0 ? `
     <div style="padding:16px 20px;background:rgba(74,222,128,.04);border:1px dashed rgba(74,222,128,.2);border-radius:10px;color:var(--grn);font-size:13.5px">
       ✅ No risk findings matching active filter criteria.
@@ -1535,7 +1661,7 @@ function renderPdfOutput(data, scrollIntoView = true) {
             <span class="chip ${chipClass}" style="font-size:11px;font-weight:700">${escapeHtml(sev.toUpperCase())}</span>
             <b style="color:var(--tx);font-size:14px">${escapeHtml(f.title || 'Risk Finding')}</b>
           </div>
-          <span class="chip c-b" style="font-size:11px">${escapeHtml(f.source_page || 'Doc')}</span>
+          <span class="chip c-b" style="font-size:11px">${escapeHtml(String(f.source_page || 'Doc'))}</span>
         </div>
         <p class="mut" style="font-size:13px;line-height:1.5;margin:0 0 8px">${escapeHtml(f.description || '')}</p>
         ${f.why_it_matters ? `
@@ -1552,7 +1678,7 @@ function renderPdfOutput(data, scrollIntoView = true) {
     `;
   }).join('');
 
-  // 5. Missing Gaps HTML
+  // Section 6: Missing Gaps HTML
   const gapsHtml = gaps.length === 0 ? `
     <div style="padding:16px 20px;background:rgba(74,222,128,.04);border:1px dashed rgba(74,222,128,.2);border-radius:10px;color:var(--grn);font-size:13.5px">
       ✅ No critical requirement gaps detected in this specification.
@@ -1577,7 +1703,35 @@ function renderPdfOutput(data, scrollIntoView = true) {
     `;
   }).join('');
 
-  // 6. Traceability Cards HTML
+  // Section 7: AI Insights (Facts vs Interpretations) HTML
+  const factsList = ai.extracted_facts || [];
+  let aiInsightsHtml = `
+    <div class="grid g2" style="gap:14px;margin-bottom:14px">
+      <div style="background:rgba(8,11,26,.65);border:1px solid rgba(196,181,253,.18);border-radius:10px;padding:14px">
+        <div class="row sp" style="margin-bottom:8px">
+          <b style="color:var(--l);font-size:13.5px">📌 Extracted Facts (Grounded in Document)</b>
+          <span class="chip c-b" style="font-size:10px">Verified Facts</span>
+        </div>
+        <ul style="margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--tx);line-height:1.6">
+          ${factsList.map(f => `<li>${escapeHtml(f)}</li>`).join('')}
+        </ul>
+      </div>
+      <div style="background:rgba(8,11,26,.65);border:1px solid rgba(196,181,253,.18);border-radius:10px;padding:14px">
+        <div class="row sp" style="margin-bottom:8px">
+          <b style="color:var(--grn);font-size:13.5px">🤖 AI Architectural Interpretations</b>
+          <span class="chip c-g" style="font-size:10px">${escapeHtml(ai.model || 'Gemini Intelligence')}</span>
+        </div>
+        <p style="font-size:12.5px;color:var(--mut);line-height:1.55;margin:0 0 8px">
+          <b>Architecture Evaluation:</b> ${escapeHtml(ai.ai_architecture_evaluation || 'Decomposition verified.')}
+        </p>
+        <p style="font-size:12.5px;color:var(--mut);line-height:1.55;margin:0">
+          <b>Security Assessment:</b> ${escapeHtml(ai.security_assessment || 'Security standards analyzed.')}
+        </p>
+      </div>
+    </div>
+  `;
+
+  // Section 9: Traceability Cards HTML
   const traceHtml = tm.length === 0 ? `
     <div class="empty">No individual requirement IDs identified for traceability matrix.</div>
   ` : `
@@ -1602,21 +1756,52 @@ function renderPdfOutput(data, scrollIntoView = true) {
     </div>
   `;
 
-  // Render Full Results Assembly
+  // Section 10: Recommendations & Conclusion HTML
+  const recsList = ai.recommendations || [];
+  let conclusionHtml = `
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px">
+      ${recsList.map(r => {
+        const pri = (r.priority || 'Medium').toLowerCase();
+        const priChip = pri === 'high' ? 'c-r' : (pri === 'medium' ? 'c-a' : 'c-b');
+        return `
+          <div style="background:rgba(8,11,26,.7);border:1px solid rgba(196,181,253,.2);border-radius:10px;padding:14px">
+            <div class="row sp" style="align-items:flex-start;margin-bottom:6px">
+              <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+                <span class="chip ${priChip}" style="font-size:11px;font-weight:700">${escapeHtml((r.priority || 'MEDIUM').toUpperCase())}</span>
+                <b style="color:var(--tx);font-size:14px">${escapeHtml(r.title || 'Recommendation')}</b>
+              </div>
+              <span class="chip c-b" style="font-size:11px">${escapeHtml(r.category || 'Engineering')}</span>
+            </div>
+            <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(r.detail || '')}</p>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    <div style="background:rgba(16,22,43,.85);border:1px solid rgba(74,222,128,.3);border-radius:10px;padding:16px">
+      <b style="color:var(--grn);font-size:14px">🏁 Final Engineering Conclusion:</b>
+      <p style="color:var(--tx);font-size:13.5px;line-height:1.6;margin:6px 0 0">${escapeHtml(ai.conclusion || 'Specification reviewed and archived in engineering history.')}</p>
+    </div>
+  `;
+
+  // Render Full Results Assembly (All 10 Professional Sections)
   el.innerHTML = `
     <!-- Top Summary Banner -->
     <div class="card mt" style="background:linear-gradient(135deg,rgba(139,92,246,.2),rgba(59,130,246,.12));border:1px solid rgba(196,181,253,.3);margin-bottom:18px">
       <div class="row sp" style="align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <div class="row" style="gap:10px;align-items:center">
-          <span style="font-size:26px">📑</span>
+          <span style="font-size:28px">${escapeHtml(data.document_type_icon || '📑')}</span>
           <div>
-            <h2 style="font-size:22px;margin:0">${escapeHtml(data.input_name || 'Technical Specification')}</h2>
-            <div class="mut" style="font-size:12.5px;margin-top:2px">TechSpecAnalyser Specification Intelligence · Analysis ID: ${escapeHtml(data.analysis_id || 'COMPLETED')}</div>
+            <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
+              <h2 style="font-size:22px;margin:0">${escapeHtml(data.input_name || 'Technical Specification')}</h2>
+              <span class="chip c-b" style="font-size:12px;font-weight:700">${escapeHtml(data.document_type_icon || '📋')} ${escapeHtml(data.document_type_label || 'Technical Specification')}</span>
+            </div>
+            <div class="mut" style="font-size:12.5px;margin-top:2px">TechSpecAnalyser Engineering Intelligence · Audit ID: ${escapeHtml(data.analysis_id || 'COMPLETED')}</div>
           </div>
         </div>
-        <div class="row" style="gap:8px">
-          <button type="button" class="btn ghost" onclick="exportPdfAnalysisReport()" style="padding:8px 16px;animation:none">📄 Export PDF Report</button>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <a href="/api/analysis/pdf/${data.analysis_id}/report" download class="btn" style="padding:8px 16px;text-decoration:none;display:inline-flex;align-items:center;gap:6px;animation:none">📄 Download Professional PDF Report</a>
           <button type="button" class="btn ghost" onclick="downloadPdfJsonReport()" style="padding:8px 16px;animation:none">💾 Download JSON</button>
+          <button type="button" class="btn ghost" onclick="exportPdfAnalysisReport()" style="padding:8px 16px;animation:none">🖨️ Print / Web PDF</button>
         </div>
       </div>
 
@@ -1649,17 +1834,13 @@ function renderPdfOutput(data, scrollIntoView = true) {
           <span class="chip c-g" style="font-size:10px;margin-top:2px">${escapeHtml(level)}</span>
         </div>
       </div>
-
-      <div style="font-size:12px;color:var(--mut);margin-top:12px;line-height:1.5">
-        ℹ️ <b>Quality Score Index:</b> Evaluated across 8 dimensions (Completeness, Clarity, Consistency, Security, Performance, Architecture, Testability, Constraints). Level: <b>${escapeHtml(level)}</b>.
-      </div>
     </div>
 
-    <!-- Detailed Specification Quality Score Card -->
+    <!-- 8. Specification Quality Scorecard (Overview) -->
     <div class="card mt" style="background:rgba(16,22,43,.75);border:1px solid var(--line);margin-bottom:18px">
       <div class="row sp" style="align-items:center;margin-bottom:12px">
         <div>
-          <h3 style="font-size:16px;margin:0">Specification Quality Score (0–100)</h3>
+          <h3 style="font-size:16px;margin:0">8. Specification Quality Scorecard (0–100)</h3>
           <p class="mut" style="font-size:12.5px;margin:2px 0 0">${escapeHtml(scoreDesc)}</p>
         </div>
         <span class="chip c-b" style="font-size:12px;font-weight:700">${score}/100 · ${escapeHtml(level.toUpperCase())}</span>
@@ -1697,36 +1878,26 @@ function renderPdfOutput(data, scrollIntoView = true) {
       </div>
     </div>
 
-    <!-- The 6 Expandable Result Sections -->
-    <!-- 1. Executive Summary & Architecture Overview -->
+    <!-- The 10 Professional Expandable Result Sections -->
+
+    <!-- 1. Executive Summary & Document Scope -->
     <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
       <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
         <div class="row" style="gap:10px">
-          <b style="font-size:15px;color:var(--tx)">1. Executive Summary & Technical Overview</b>
-          <span class="chip c-b" style="font-size:12px">${escapeHtml(ai.model || 'Specification Intelligence')}</span>
+          <b style="font-size:15px;color:var(--tx)">1. Executive Summary & Document Scope</b>
+          <span class="chip c-b" style="font-size:12px">${escapeHtml(data.document_type_label || 'SRS')}</span>
         </div>
         <span class="chip c-g">READY</span>
       </summary>
       <div style="padding:16px 20px 20px">
         <div style="background:rgba(139,92,246,.08);border:1px solid rgba(196,181,253,.25);border-radius:10px;padding:14px;margin-bottom:14px">
-          <b style="color:var(--l);font-size:13.5px">📋 Executive Summary</b>
+          <b style="color:var(--l);font-size:13.5px">📋 Executive Scope & Purpose</b>
           <p style="color:var(--tx);font-size:13.5px;line-height:1.6;margin:6px 0 0">${escapeHtml(ai.executive_summary || 'Analysis completed.')}</p>
         </div>
-        <div style="margin-bottom:14px">
-          <b style="color:var(--tx);font-size:13.5px">🔍 Key Technical Observations:</b>
-          <ul style="margin:8px 0 0;padding-left:20px;font-size:13px;color:var(--mut);line-height:1.65">
-            ${(ai.key_observations || []).map(obs => `<li><span class="chip c-b" style="font-size:10px;margin-right:6px">Explicit</span>${escapeHtml(obs)}</li>`).join('')}
-          </ul>
-        </div>
-        <div class="grid g2" style="gap:12px">
-          <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:10px;padding:12px">
-            <h4 style="font-size:13px;color:var(--grn);margin:0 0 6px">Requirement Clarity Assessment</h4>
-            <p class="mut" style="font-size:12.5px;margin:0;line-height:1.5">${escapeHtml((ai.clarity_assessment && ai.clarity_assessment.detail) || 'Requirements defined.')}</p>
-          </div>
-          <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:10px;padding:12px">
-            <h4 style="font-size:13px;color:var(--amb);margin:0 0 6px">Technical Feasibility Concerns</h4>
-            <p class="mut" style="font-size:12.5px;margin:0;line-height:1.5">${escapeHtml((ai.feasibility_concerns && ai.feasibility_concerns[0]) || 'Standard design.')}</p>
-          </div>
+        <div class="row sp" style="font-size:12.5px;color:var(--mut);padding:8px 12px;background:rgba(8,11,26,.6);border-radius:8px;border:1px solid var(--line)">
+          <span><b>Classification:</b> ${escapeHtml(data.document_type_label || 'Technical Document')}</span>
+          <span><b>Evaluated Engine:</b> ${escapeHtml(ai.model || 'Specification Intelligence')}</span>
+          <span><b>Clarity Rating:</b> <span class="chip c-g" style="font-size:10.5px">${escapeHtml(ai.clarity_rating || 'High')}</span></span>
         </div>
       </div>
     </details>
@@ -1743,40 +1914,35 @@ function renderPdfOutput(data, scrollIntoView = true) {
       <div style="padding:16px 20px 20px">${specSectionsHtml}</div>
     </details>
 
-    <!-- 3. AI-Generated Insights & Recommendations -->
+    <!-- 3. Functional and Non-Functional Requirements -->
     <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
       <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
         <div class="row" style="gap:10px">
-          <b style="font-size:15px;color:var(--tx)">3. AI-Generated Insights & Recommendations</b>
-          <span class="chip c-b" style="font-size:12px">${(ai.recommendations || []).length} Strategic Action(s)</span>
+          <b style="font-size:15px;color:var(--tx)">3. Functional & Non-Functional Requirements</b>
+          <span class="chip c-b" style="font-size:12px">${frList.length} Functional · ${nfrList.length} Non-Functional</span>
         </div>
-        <span class="chip c-b">ACTIONABLE</span>
+        <span class="chip c-b">STRUCTURED</span>
       </summary>
-      <div style="padding:16px 20px 20px">
-        ${(ai.recommendations || []).map(r => {
-          const pri = (r.priority || 'Medium').toLowerCase();
-          const priChip = pri === 'high' ? 'c-r' : (pri === 'medium' ? 'c-a' : 'c-b');
-          return `
-            <div style="margin-bottom:12px;background:rgba(8,11,26,.7);border:1px solid rgba(196,181,253,.2);border-radius:10px;padding:14px">
-              <div class="row sp" style="align-items:flex-start;margin-bottom:6px">
-                <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">
-                  <span class="chip ${priChip}" style="font-size:11px;font-weight:700">${escapeHtml((r.priority || 'MEDIUM').toUpperCase())}</span>
-                  <b style="color:var(--tx);font-size:14px">${escapeHtml(r.title || 'Recommendation')}</b>
-                </div>
-                <span class="chip c-b" style="font-size:11px">${escapeHtml(r.category || 'Architecture')}</span>
-              </div>
-              <p class="mut" style="font-size:13px;line-height:1.55;margin:0">${escapeHtml(r.detail || '')}</p>
-            </div>
-          `;
-        }).join('')}
-      </div>
+      <div style="padding:16px 20px 20px">${reqsBreakdownHtml}</div>
     </details>
 
-    <!-- 4. Risk & Severity Analysis -->
+    <!-- 4. Architecture and Technology Analysis -->
     <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
       <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
         <div class="row" style="gap:10px">
-          <b style="font-size:15px;color:var(--tx)">4. Risk & Severity Analysis</b>
+          <b style="font-size:15px;color:var(--tx)">4. Architecture and Technology Analysis</b>
+          <span class="chip c-g" style="font-size:12px">Patterns & Stack</span>
+        </div>
+        <span class="chip c-g">ANALYZED</span>
+      </summary>
+      <div style="padding:16px 20px 20px">${archAnalysisHtml}</div>
+    </details>
+
+    <!-- 5. Security and Risk Assessment -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">5. Security and Risk Assessment</b>
           <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);border-color:rgba(196,181,253,.25);color:var(--l)">${findings.length} Evaluation(s)</span>
         </div>
         <div class="row" style="gap:8px">
@@ -1806,11 +1972,11 @@ function renderPdfOutput(data, scrollIntoView = true) {
       </div>
     </details>
 
-    <!-- 5. Missing Requirements & Gap Detection -->
+    <!-- 6. Missing Requirements and Gap Analysis -->
     <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
       <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
         <div class="row" style="gap:10px">
-          <b style="font-size:15px;color:var(--tx)">5. Missing Requirements & Gap Detection</b>
+          <b style="font-size:15px;color:var(--tx)">6. Missing Requirements and Gap Analysis</b>
           <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);border-color:rgba(196,181,253,.25);color:var(--l)">${gaps.length} Gap(s) Identified</span>
         </div>
         <span class="chip ${gaps.length ? 'c-a' : 'c-g'}">${gaps.length ? 'GAPS DETECTED' : 'COMPLETE'}</span>
@@ -1818,11 +1984,23 @@ function renderPdfOutput(data, scrollIntoView = true) {
       <div style="padding:16px 20px 20px">${gapsHtml}</div>
     </details>
 
-    <!-- 6. Requirement Traceability Matrix -->
+    <!-- 7. AI-Generated Insights (Facts vs AI Interpretations) -->
     <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
       <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
         <div class="row" style="gap:10px">
-          <b style="font-size:15px;color:var(--tx)">6. Requirement Traceability Matrix</b>
+          <b style="font-size:15px;color:var(--tx)">7. AI-Generated Insights (Facts vs Interpretations)</b>
+          <span class="chip c-b" style="font-size:12px">${escapeHtml(ai.model || 'Specification Intelligence')}</span>
+        </div>
+        <span class="chip c-b">GROUNDED</span>
+      </summary>
+      <div style="padding:16px 20px 20px">${aiInsightsHtml}</div>
+    </details>
+
+    <!-- 9. Requirement Traceability Matrix -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">9. Requirement Traceability Matrix</b>
           <span class="chip c-b" style="font-size:12px">${tm.length} Mapped Requirement(s)</span>
         </div>
         <span class="chip c-g">TRACEABLE</span>
@@ -1834,6 +2012,18 @@ function renderPdfOutput(data, scrollIntoView = true) {
         </div>
         <div>${traceHtml}</div>
       </div>
+    </details>
+
+    <!-- 10. Recommendations and Conclusion -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">10. Recommendations & Engineering Conclusion</b>
+          <span class="chip c-b" style="font-size:12px">${recsList.length} Roadmap Actions</span>
+        </div>
+        <span class="chip c-g">ACTIONABLE</span>
+      </summary>
+      <div style="padding:16px 20px 20px">${conclusionHtml}</div>
     </details>
   `;
 
@@ -2090,6 +2280,48 @@ if(k=='github-review'){
           toast('Sample technical specification analyzed!');
         } catch(err) {
           clearTimeout(timer1); clearTimeout(timer2); clearTimeout(timer3); clearTimeout(timer4);
+          an.classList.remove('busy');
+          if(p) p.style.display='none';
+          if(pStatus) pStatus.style.display='none';
+          toast('Error: ' + err.message);
+        }
+      };
+    }
+
+    // Unsupported Document Test Button
+    const unsupportedBtn = $('#pdf-unsupported-btn');
+    if(unsupportedBtn) {
+      unsupportedBtn.onclick = async () => {
+        if(an.classList.contains('busy')) return;
+        an.classList.add('busy');
+        const p=$('#pg');
+        const pStatus=$('#pg-status');
+        const pText=$('#pg-text');
+        if(p) p.style.display='block';
+        if(pStatus) pStatus.style.display='flex';
+
+        const updateProgress=(pct, text)=>{
+          if(p && p.firstElementChild) p.firstElementChild.style.width=pct+'%';
+          if(pText) pText.textContent=text;
+        };
+
+        updateProgress(25, 'Loading non-technical document sample (Culinary Sourdough Guide)...');
+        const timer1=setTimeout(()=>updateProgress(60, 'Evaluating software engineering relevance & domain markers...'), 700);
+
+        try {
+          const res = await fetch('/api/analysis/pdf/sample-unsupported', { method: 'POST' });
+          clearTimeout(timer1);
+          const data = await res.json();
+          updateProgress(100, 'Classification completed!');
+          setTimeout(() => {
+            if(p) p.style.display='none';
+            if(pStatus) pStatus.style.display='none';
+          }, 350);
+          an.classList.remove('busy');
+          renderPdfOutput(data);
+          toast('Non-technical document detected and flagged!');
+        } catch(err) {
+          clearTimeout(timer1);
           an.classList.remove('busy');
           if(p) p.style.display='none';
           if(pStatus) pStatus.style.display='none';
