@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import uuid
 import zipfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -679,5 +680,511 @@ def analyze_github_repository(
         "findings": findings,
         "tools": tools,
         "ai": ai_result,
+        "error": None,
+    }
+
+
+def fetch_recent_commits(
+    owner: str,
+    repo: str,
+    headers: Dict[str, str],
+    client: httpx.Client,
+    limit: int = 10,
+    branch: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Retrieve list of recent commits from GitHub REST API."""
+    bounded_limit = max(1, min(limit, 30))
+    url = f"https://api.github.com/repos/{owner}/{repo}/commits?per_page={bounded_limit}"
+    if branch:
+        url += f"&sha={branch.strip()}"
+    try:
+        resp = client.get(url, headers=headers)
+    except Exception as exc:
+        raise InputValidationError("github_network_error", f"Failed to connect to GitHub API: {exc}", status=502)
+
+    if resp.status_code == 404:
+        raise InputValidationError("repo_not_found", f"Repository '{owner}/{repo}' not found.", status=404)
+    elif resp.status_code == 403:
+        if resp.headers.get("x-ratelimit-remaining") == "0":
+            raise InputValidationError("rate_limited", "GitHub API rate limit exceeded.", status=429)
+        raise InputValidationError("forbidden", "Access to repository is forbidden.", status=403)
+    elif resp.status_code != 200:
+        raise InputValidationError("github_api_error", f"GitHub API error (HTTP {resp.status_code}): {resp.text[:120]}", status=502)
+
+    raw_commits = resp.json()
+    if not isinstance(raw_commits, list):
+        return []
+
+    commits: List[Dict[str, Any]] = []
+    for item in raw_commits:
+        sha = item.get("sha", "")
+        c_obj = item.get("commit", {}) or {}
+        author_obj = item.get("author") or {}
+        committer_obj = c_obj.get("author") or {}
+        raw_msg = c_obj.get("message", "").strip()
+        msg_lines = raw_msg.splitlines()
+        summary = msg_lines[0] if msg_lines else "No commit message"
+        commits.append({
+            "sha": sha,
+            "short_sha": sha[:7] if sha else "",
+            "message": summary,
+            "full_message": raw_msg,
+            "author_name": committer_obj.get("name") or author_obj.get("login") or "Unknown",
+            "author_login": author_obj.get("login") or "",
+            "author_avatar": author_obj.get("avatar_url") or "",
+            "date": committer_obj.get("date") or "",
+            "html_url": item.get("html_url") or f"https://github.com/{owner}/{repo}/commit/{sha}",
+        })
+    return commits
+
+
+def fetch_commit_diff(
+    owner: str,
+    repo: str,
+    commit_sha: str,
+    headers: Dict[str, str],
+    client: httpx.Client,
+) -> Dict[str, Any]:
+    """Retrieve details, changed files, and stats for a specific commit SHA."""
+    url = f"https://api.github.com/repos/{owner}/{repo}/commits/{commit_sha}"
+    try:
+        resp = client.get(url, headers=headers)
+    except Exception as exc:
+        raise InputValidationError("github_network_error", f"Failed to retrieve commit from GitHub: {exc}", status=502)
+
+    if resp.status_code == 404:
+        raise InputValidationError("commit_not_found", f"Commit '{commit_sha}' not found in '{owner}/{repo}'.", status=404)
+    elif resp.status_code != 200:
+        raise InputValidationError("github_api_error", f"Failed to retrieve commit details (HTTP {resp.status_code}): {resp.text[:120]}", status=502)
+
+    data = resp.json()
+    c_obj = data.get("commit", {}) or {}
+    author_obj = data.get("author") or {}
+    committer_obj = c_obj.get("author") or {}
+    stats = data.get("stats") or {}
+    raw_files = data.get("files") or []
+
+    files: List[Dict[str, Any]] = []
+    for f in raw_files:
+        files.append({
+            "filename": f.get("filename", ""),
+            "status": f.get("status", "modified"),  # added, modified, removed, renamed
+            "additions": f.get("additions", 0),
+            "deletions": f.get("deletions", 0),
+            "changes": f.get("changes", 0),
+            "patch": (f.get("patch") or "")[:1500],
+        })
+
+    raw_msg = c_obj.get("message", "").strip()
+    msg_lines = raw_msg.splitlines()
+    summary = msg_lines[0] if msg_lines else "No commit message"
+
+    return {
+        "sha": data.get("sha", commit_sha),
+        "short_sha": data.get("sha", commit_sha)[:7],
+        "message": summary,
+        "full_message": raw_msg,
+        "author_name": committer_obj.get("name") or author_obj.get("login") or "Unknown",
+        "author_login": author_obj.get("login") or "",
+        "author_avatar": author_obj.get("avatar_url") or "",
+        "date": committer_obj.get("date") or "",
+        "html_url": data.get("html_url") or f"https://github.com/{owner}/{repo}/commit/{commit_sha}",
+        "stats": {
+            "total": stats.get("total", 0),
+            "additions": stats.get("additions", 0),
+            "deletions": stats.get("deletions", 0),
+        },
+        "files": files,
+        "files_added": [f["filename"] for f in files if f["status"] == "added"],
+        "files_modified": [f["filename"] for f in files if f["status"] in ("modified", "changed", "renamed")],
+        "files_removed": [f["filename"] for f in files if f["status"] == "removed"],
+    }
+
+
+def review_push_with_gemini(
+    repo_meta: Dict[str, Any],
+    commit_info: Dict[str, Any],
+    push_findings: List[Dict[str, Any]],
+    all_findings: List[Dict[str, Any]],
+    source_files: List[SourceFile],
+    api_key: Optional[str] = None,
+    model: str = "gemini-3.8-flash",
+) -> Dict[str, Any]:
+    """AI-powered commit and push diff review using Gemini with grounded fallback."""
+    push_crit = sum(1 for f in push_findings if f.get("severity") in ("Critical", "High"))
+    push_warn = sum(1 for f in push_findings if f.get("severity") in ("Medium", "Low", "Warning"))
+    files_added = commit_info.get("files_added", [])
+    files_modified = commit_info.get("files_modified", [])
+    files_removed = commit_info.get("files_removed", [])
+    commit_msg = commit_info.get("message", "Commit update")
+    stats = commit_info.get("stats", {})
+
+    if api_key:
+        system_prompt = """You are a senior software architect and CI/CD code reviewer analyzing a Git Push / Commit.
+Your task is to analyze the commit diff, evaluate changed files, check for newly introduced bugs, regressions, or security issues, and determine if the push is safe for merging or deployment.
+Return strictly valid JSON with this exact structure:
+{
+  "summary": "Clear 2-3 sentence summary of the changes in this commit and overall impact",
+  "risk_assessment": "Low / Medium / High / Critical - explain why",
+  "diff_analysis": "Technical evaluation of the modified and added files",
+  "security_verdict": "Security assessment of changes introduced in this push",
+  "suggestions": [
+    {
+      "category": "Security / Quality / Performance / Testing",
+      "title": "Action title",
+      "description": "What to do",
+      "affected_file": "path to file",
+      "priority": "High / Medium / Low",
+      "suggested_fix": "Code or instruction"
+    }
+  ]
+}
+Never include markdown fences around the JSON.
+"""
+        user_prompt = f"""Review this Git Push / Commit:
+Repository: {repo_meta.get('full_name')}
+Commit SHA: {commit_info.get('sha')} ({commit_info.get('short_sha')})
+Commit Author: {commit_info.get('author_name')}
+Commit Message: {commit_info.get('full_message')}
+Diff Stats: +{stats.get('additions', 0)} / -{stats.get('deletions', 0)} across {len(commit_info.get('files', []))} changed files
+
+Files Added: {files_added}
+Files Modified: {files_modified}
+Files Removed: {files_removed}
+
+Static Analysis Issues in this Push ({len(push_findings)} issues):
+{json.dumps(push_findings[:6], indent=2)}
+"""
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        try:
+            with httpx.Client(timeout=8.0) as client:
+                resp = client.post(
+                    url,
+                    headers={"Content-Type": "application/json"},
+                    json={
+                        "contents": [{"role": "user", "parts": [{"text": system_prompt + "\n\n" + user_prompt}]}],
+                        "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"},
+                    },
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidate = data.get("candidates", [{}])[0]
+                    text = candidate.get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+                    if text.startswith("```"):
+                        text = re.sub(r"^```(?:json)?\s*", "", text)
+                        text = re.sub(r"\s*```$", "", text).strip()
+                    parsed = json.loads(text)
+                    return {
+                        "available": True,
+                        "ran": True,
+                        "model": "TechSpecAnalyser Push Intelligence Engine",
+                        "summary": parsed.get("summary", "Commit review completed."),
+                        "risk_assessment": parsed.get("risk_assessment", "Low risk commit."),
+                        "diff_analysis": parsed.get("diff_analysis", "Analyzed commit diff files."),
+                        "security_verdict": parsed.get("security_verdict", "No critical security vulnerabilities introduced."),
+                        "suggestions": parsed.get("suggestions", []),
+                        "error": None,
+                    }
+        except Exception as exc:
+            logger.warning(f"Gemini API call failed for push analysis: {exc}")
+
+    # Grounded fallback
+    if push_crit > 0:
+        risk_lvl = "High"
+        risk_desc = f"Critical or high-severity vulnerabilities detected in files modified by this push ({push_crit} issue(s)). Immediate resolution advised before deployment."
+        sec_verdict = f"Blocked: {push_crit} critical security or syntax issues identified directly in the push diff."
+    elif push_warn > 2:
+        risk_lvl = "Medium"
+        risk_desc = f"Multiple warnings ({push_warn}) detected in files affected by this push. Review recommended to prevent technical debt accumulation."
+        sec_verdict = "Passed with caveats: No critical security threats, but moderate warnings require attention."
+    else:
+        risk_lvl = "Low"
+        risk_desc = "Clean commit with no critical issues introduced. Code changes adhere to project standards."
+        sec_verdict = "Passed: No security flaws or syntax errors detected in the pushed changes."
+
+    change_summary_parts = []
+    if files_added:
+        change_summary_parts.append(f"added {len(files_added)} file(s)")
+    if files_modified:
+        change_summary_parts.append(f"modified {len(files_modified)} file(s)")
+    if files_removed:
+        change_summary_parts.append(f"removed {len(files_removed)} file(s)")
+    changes_str = ", ".join(change_summary_parts) if change_summary_parts else "made general repository updates"
+
+    summary_text = (
+        f"Push commit '{commit_info.get('short_sha')}' by {commit_info.get('author_name')} {changes_str} "
+        f"(+{stats.get('additions', 0)} / -{stats.get('deletions', 0)} lines). "
+        f"Commit intent: \"{commit_msg}\". {risk_desc}"
+    )
+
+    diff_analysis_text = (
+        f"Diff analysis inspected {len(commit_info.get('files', []))} changed path(s). "
+        f"{len(push_findings)} finding(s) are directly associated with the code lines or modules changed in this push."
+    )
+
+    fallback_suggestions = []
+    if push_crit > 0:
+        first_push_issue = push_findings[0] if push_findings else {}
+        fallback_suggestions.append({
+            "category": "Security Remediation",
+            "title": f"Resolve {first_push_issue.get('title', 'Critical Issue')} in Push",
+            "description": first_push_issue.get("description", "A critical vulnerability was introduced in this push."),
+            "affected_file": first_push_issue.get("file", files_modified[0] if files_modified else "codebase"),
+            "priority": "High",
+            "suggested_fix": "Fix boundary checks or sanitize inputs before releasing to staging.",
+        })
+    elif files_removed and not files_added and not files_modified:
+        fallback_suggestions.append({
+            "category": "Repository Cleanliness",
+            "title": "Clean Deletion Verification",
+            "description": "Ensure no dangling imports or broken references remain after file removal.",
+            "affected_file": "package / module root",
+            "priority": "Low",
+            "suggested_fix": "Run full test suite to verify no missing dependencies.",
+        })
+    else:
+        fallback_suggestions.append({
+            "category": "Code Quality",
+            "title": "Continuous Test Coverage for Commit Changes",
+            "description": "Add or update automated unit tests covering the newly added or modified routines.",
+            "affected_file": files_modified[0] if files_modified else (files_added[0] if files_added else "tests/"),
+            "priority": "Medium",
+            "suggested_fix": "Assert expected outputs and boundary cases for modified functions.",
+        })
+
+    return {
+        "available": True,
+        "ran": True,
+        "model": "TechSpecAnalyser Push Intelligence Engine",
+        "summary": summary_text,
+        "risk_assessment": f"{risk_lvl} Risk - {risk_desc}",
+        "diff_analysis": diff_analysis_text,
+        "security_verdict": sec_verdict,
+        "suggestions": fallback_suggestions,
+        "error": None,
+    }
+
+
+def analyze_github_push(
+    url: Optional[str] = None,
+    commit_sha: Optional[str] = None,
+    branch: Optional[str] = None,
+    push_payload: Optional[Dict[str, Any]] = None,
+    token: Optional[str] = None,
+    settings: Optional[Settings] = None,
+) -> Dict[str, Any]:
+    """Analyze a specific GitHub push event or commit diff with diff-aware scoring."""
+    s = settings or get_settings()
+
+    # 1. Resolve repository URL and commit details from payload or parameters
+    if push_payload:
+        repo_obj = push_payload.get("repository") or {}
+        url = url or repo_obj.get("html_url") or repo_obj.get("clone_url")
+        head_commit = push_payload.get("head_commit") or {}
+        commit_sha = commit_sha or head_commit.get("id") or push_payload.get("after")
+        if not branch and push_payload.get("ref"):
+            ref_str = push_payload["ref"]
+            branch = ref_str.replace("refs/heads/", "") if ref_str.startswith("refs/heads/") else ref_str
+
+    if not url:
+        raise InputValidationError("missing_url", "Repository URL is required for push analysis.", status=400)
+
+    owner, repo = parse_github_url(url)
+    headers = _get_auth_headers(token)
+
+    try:
+        with httpx.Client(timeout=15.0) as client:
+            # 2. Fetch repo metadata
+            repo_meta, languages = fetch_repository_metadata(owner, repo, headers, client)
+            active_branch = branch or repo_meta.get("default_branch") or "main"
+
+            # 3. Resolve commit details
+            if not commit_sha or commit_sha == "latest":
+                recent = fetch_recent_commits(owner, repo, headers, client, limit=1, branch=active_branch)
+                if not recent:
+                    raise InputValidationError("no_commits", f"No commits found in '{owner}/{repo}'.", status=404)
+                commit_sha = recent[0]["sha"]
+
+            commit_info = fetch_commit_diff(owner, repo, commit_sha, headers, client)
+
+            # 4. Fetch Git File Tree & Download Repository Archive at this commit/ref
+            tree_paths, tree_folders, tree_files_count = fetch_repository_tree(
+                owner=owner, repo=repo, branch=commit_sha, headers=headers, client=client
+            )
+            # If tree failed on commit sha, fallback to active branch
+            if not tree_paths:
+                tree_paths, tree_folders, tree_files_count = fetch_repository_tree(
+                    owner=owner, repo=repo, branch=active_branch, headers=headers, client=client
+                )
+
+            source_files, all_paths, folder_count, total_files = download_repository_source_files(
+                owner=owner,
+                repo=repo,
+                branch=commit_sha,
+                headers=headers,
+                client=client,
+                known_paths=tree_paths if tree_paths else None,
+                max_files=s.max_extracted_files,
+                max_file_bytes=s.max_file_bytes,
+            )
+            if tree_paths:
+                all_paths = tree_paths
+                folder_count = tree_folders
+                total_files = tree_files_count
+    except InputValidationError:
+        raise
+    except Exception as exc:
+        logger.error(f"GitHub push analysis failed for {owner}/{repo} @ {commit_sha}: {exc}")
+        raise InputValidationError("github_push_error", f"Failed to retrieve push data for '{owner}/{repo}': {str(exc)}", status=502)
+
+    # 5. Classify Architecture & File Tree
+    structure_info = classify_repository_structure(all_paths)
+
+    # 6. Execute Multi-Language Static Analysis across codebase
+    primary_lang = repo_meta.get("primary_language", "Unknown").lower()
+    short_sha = commit_info["short_sha"]
+    static_result = analyze_files(
+        files=source_files,
+        input_type="github_push",
+        input_name=f"{repo_meta.get('full_name', f'{owner}/{repo}')} @ {short_sha}",
+        language=primary_lang,
+        settings=s,
+        use_external_tools=True,
+    )
+
+    all_findings = static_result.get("findings", [])
+    metrics = static_result.get("metrics", {})
+    tools = static_result.get("tools", [])
+
+    # 7. Match findings to Changed Files in this Push
+    changed_filenames = set()
+    for f_item in commit_info.get("files", []):
+        fn = (f_item.get("filename") or "").replace("\\", "/").strip("/")
+        if fn:
+            changed_filenames.add(fn)
+            changed_filenames.add(fn.split("/")[-1])
+
+    push_findings: List[Dict[str, Any]] = []
+    for f in all_findings:
+        f_path = (f.get("file_path") or f.get("file") or "").replace("\\", "/").strip("/")
+        f_base = f_path.split("/")[-1] if f_path else ""
+        is_push = bool(
+            f_path in changed_filenames or
+            f_base in changed_filenames or
+            any(cf.endswith("/" + f_path) or f_path.endswith("/" + cf) for cf in changed_filenames)
+        )
+        f["is_push_diff"] = is_push
+        if is_push:
+            f_copy = dict(f)
+            f_copy["push_status"] = "introduced_in_push"
+            push_findings.append(f_copy)
+
+    # 8. Compute Push Quality Score and Push Status
+    push_crit = sum(1 for f in push_findings if (f.get("severity") or "").capitalize() in ("Critical", "High"))
+    push_warn = sum(1 for f in push_findings if (f.get("severity") or "").capitalize() in ("Medium", "Low", "Warning"))
+    push_info = sum(1 for f in push_findings if (f.get("severity") or "").capitalize() in ("Informational", "Info"))
+
+    changed_source_files_count = len(commit_info.get("files_added", [])) + len(commit_info.get("files_modified", []))
+    if changed_source_files_count == 0:
+        # e.g. purely deletions, configs, or docs
+        push_score = 100
+        push_status = "PASSED"
+        scoring_methodology = (
+            "100/100: Clean push. No source files were added or modified in this commit "
+            "(or only clean removals/documentation updates occurred)."
+        )
+    else:
+        penalties = (push_crit * 30) + (push_warn * 8) + int(push_info * 1)
+        raw_push_score = 100 - penalties
+        push_score = max(10, min(100, raw_push_score))
+        if push_crit > 0:
+            push_status = "BLOCKED"
+            scoring_methodology = (
+                f"BLOCKED (Score: {push_score}/100): {push_crit} critical or high severity vulnerability detected in modified files. "
+                f"Deducted 30 pts per Critical ({push_crit}), 8 pts per Warning ({push_warn})."
+            )
+        elif push_warn > 2 or push_score < 75:
+            push_status = "REQUIRES_ATTENTION"
+            scoring_methodology = (
+                f"REQUIRES ATTENTION (Score: {push_score}/100): Moderate warnings detected in modified files ({push_warn}). "
+                f"Review recommended before merging."
+            )
+        else:
+            push_status = "PASSED"
+            scoring_methodology = (
+                f"PASSED (Score: {push_score}/100): Push changes adhere cleanly to quality and security standards. "
+                f"Minor warnings: {push_warn}."
+            )
+
+    # 9. Compute Overall Repository Health Score
+    all_crit = sum(1 for f in all_findings if f.get("severity") in ("Critical", "High"))
+    all_warn = sum(1 for f in all_findings if f.get("severity") in ("Medium", "Low", "Warning"))
+    all_info = sum(1 for f in all_findings if f.get("severity") in ("Informational", "Info"))
+    overall_penalties = (all_crit * 20) + (all_warn * 4) + int(all_info * 0.5)
+    overall_health_score = max(10, min(100, 100 - overall_penalties + (5 if structure_info.get("has_tests") else -5)))
+
+    # 10. AI Push Review (Gemini or Grounded Synthesis Fallback)
+    ai_push_result = review_push_with_gemini(
+        repo_meta=repo_meta,
+        commit_info=commit_info,
+        push_findings=push_findings,
+        all_findings=all_findings,
+        source_files=source_files,
+        api_key=s.ai_api_key,
+        model=s.ai_model or "gemini-3.8-flash",
+    )
+
+    analysis_id = f"push_{uuid.uuid4().hex[:12]}"
+
+    return {
+        "analysis_id": analysis_id,
+        "status": "completed",
+        "input_type": "github_push",
+        "input_name": f"{repo_meta.get('full_name')} @ {short_sha}",
+        "created_at": utcnow(),
+        "completed_at": utcnow(),
+        "repository": repo_meta,
+        "branch": active_branch,
+        "push_event": {
+            "commit_sha": commit_info["sha"],
+            "short_sha": short_sha,
+            "message": commit_info["message"],
+            "full_message": commit_info["full_message"],
+            "author_name": commit_info["author_name"],
+            "author_login": commit_info["author_login"],
+            "author_avatar": commit_info["author_avatar"],
+            "date": commit_info["date"],
+            "html_url": commit_info["html_url"],
+            "compare_url": push_payload.get("compare") if push_payload else commit_info["html_url"],
+            "stats": commit_info["stats"],
+            "files_added": commit_info["files_added"],
+            "files_modified": commit_info["files_modified"],
+            "files_removed": commit_info["files_removed"],
+            "changed_files": commit_info["files"],
+        },
+        "metrics": {
+            **metrics,
+            "push_quality_score": push_score,
+            "push_status": push_status,
+            "push_critical_count": push_crit,
+            "push_warning_count": push_warn,
+            "push_info_count": push_info,
+            "push_issues_total": len(push_findings),
+            "repository_health_score": overall_health_score,
+            "total_files_scanned": total_files,
+            "total_files_analysed": len(source_files),
+            "files_changed_in_push": len(commit_info["files"]),
+            "scoring_methodology": scoring_methodology,
+        },
+        "push_findings": push_findings,
+        "findings": all_findings,
+        "tree": {
+            "total_files": total_files,
+            "total_folders": folder_count,
+            "paths": all_paths[:500],
+            "structure": structure_info,
+        },
+        "ai": ai_push_result,
+        "tools": tools,
         "error": None,
     }

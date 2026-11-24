@@ -16,6 +16,20 @@ class GithubAnalysisRequest(BaseModel):
     token: Optional[str] = Field(None, description="Optional personal access token for private repositories")
 
 
+class GithubPushAnalysisRequest(BaseModel):
+    url: str = Field(..., min_length=5, description="GitHub repository URL (e.g. https://github.com/owner/repo)")
+    commit_sha: Optional[str] = Field(None, description="Commit SHA or ref to analyze (defaults to latest commit)")
+    branch: Optional[str] = Field(None, description="Optional branch name")
+    token: Optional[str] = Field(None, description="Optional personal access token for private repositories")
+
+
+class GithubCommitsRequest(BaseModel):
+    url: str = Field(..., min_length=5, description="GitHub repository URL")
+    branch: Optional[str] = Field(None, description="Optional branch name")
+    token: Optional[str] = Field(None, description="Optional personal access token")
+    limit: Optional[int] = Field(10, ge=1, le=30, description="Max commits to return")
+
+
 class ErrorBody(BaseModel):
     code: str
     message: str

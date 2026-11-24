@@ -41,6 +41,7 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.015em}a{color:inherit;text-de
 .btn:hover{transform:translateY(-2px);box-shadow:0 0 0 1px rgba(255,255,255,.2) inset,0 10px 34px rgba(139,92,246,.65)}
 .btn.ghost{background:rgba(196,181,253,.08);box-shadow:0 0 0 1px var(--line) inset;animation:none;color:var(--l)}
 .btn.ghost:hover{background:rgba(196,181,253,.16);box-shadow:0 0 0 1px rgba(196,181,253,.4) inset}
+.btn.tab-active{background:linear-gradient(135deg,var(--v),var(--b))!important;color:#fff!important;box-shadow:0 0 16px rgba(139,92,246,.5)!important}
 @keyframes glow{50%{box-shadow:0 0 0 1px rgba(255,255,255,.12) inset,0 8px 34px rgba(139,92,246,.62)}}
 .view{animation:in .35s ease both}@keyframes in{from{opacity:0;transform:translateY(8px)}}
 /* landing */
@@ -159,34 +160,129 @@ def calculate_score(user_query):
         else:
             total -= i
     return total</textarea><div class="row mt"><button class="btn" id="an"><span class="spin"></span>Analyze Code</button><span class="mut" id="fn"></span></div><div class="prog" id="pg"><i></i></div></div><div id="res-box" class="mt"><div class="card" style="text-align:center;padding:42px 20px;border:1px dashed var(--line);background:rgba(16,22,43,.45)"><div style="font-size:36px;margin-bottom:12px">🔬</div><h3 style="color:var(--tx);font-size:18px">Code Analysis Results</h3><p class="mut" style="max-width:560px;margin:8px auto 0;font-size:14px;line-height:1.5">No analysis has been performed yet. Paste or upload code above and click <b>"Analyze Code"</b> to generate detailed category findings, security checks, complexity analysis, and AI recommendations.</p></div></div>`,
-'github-review':()=>head('GitHub Repository Review','Connect a GitHub repository to inspect architecture, directory structure, multi-tool static findings, and AI review.')+`
-<div class="card">
-  <div class="row" style="margin-bottom:12px">
-    <input type="text" id="url" placeholder="https://github.com/owner/repository" style="flex:2;min-width:240px" aria-label="Repository URL">
-    <input type="text" id="gh-branch" placeholder="Branch (e.g. main)" style="flex:1;min-width:140px;max-width:200px" aria-label="Branch">
-    <button type="button" class="btn ghost" id="gh-sample" style="padding:10px 16px;animation:none">⚡ Sample Repo</button>
-    <button class="btn" id="an"><span class="spin"></span>Analyze Repository</button>
+'github-review':()=>head('GitHub Repository & Push Analysis','Comprehensive GitHub intelligence: Full repository review, commit diff & push quality scoring, and automated CI/CD webhooks.')+`
+<div class="row" style="gap:10px;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px;flex-wrap:wrap">
+  <button type="button" class="btn tab-active" id="gh-tab-repo" onclick="switchGithubTab('repo')" style="padding:8px 16px;font-size:13px;animation:none">🔍 Full Repository Review</button>
+  <button type="button" class="btn ghost" id="gh-tab-push" onclick="switchGithubTab('push')" style="padding:8px 16px;font-size:13px;animation:none">🚀 Push & Commit Analysis</button>
+  <button type="button" class="btn ghost" id="gh-tab-webhook" onclick="switchGithubTab('webhook')" style="padding:8px 16px;font-size:13px;animation:none">⚡ Webhook & CI/CD</button>
+</div>
+
+<!-- SECTION 1: FULL REPOSITORY REVIEW -->
+<div id="gh-section-repo">
+  <div class="card">
+    <div class="row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <input type="text" id="url" placeholder="https://github.com/owner/repository" style="flex:2;min-width:240px" aria-label="Repository URL">
+      <input type="text" id="gh-branch" placeholder="Branch (e.g. main)" style="flex:1;min-width:140px;max-width:200px" aria-label="Branch">
+      <button type="button" class="btn ghost" id="gh-sample" style="padding:10px 16px;animation:none">⚡ Sample Repo</button>
+      <button class="btn" id="an"><span class="spin"></span>Analyze Repository</button>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <details style="width:100%;background:rgba(8,11,26,.4);border:1px solid rgba(196,181,253,.15);border-radius:10px;margin-bottom:0">
+        <summary style="padding:8px 14px;font-size:12.5px;color:var(--mut)">🔑 Private Repository & Authentication (Optional)</summary>
+        <div style="padding:10px 14px">
+          <p class="mut" style="font-size:12px;margin:0 0 8px">To analyze private repositories or bypass public API rate-limits, enter a GitHub Personal Access Token (PAT). Tokens are processed securely in-memory and never logged or exposed.</p>
+          <input type="password" id="gh-token" placeholder="ghp_... or github_pat_..." style="font-size:13px;max-width:440px" aria-label="GitHub Token">
+        </div>
+      </details>
+    </div>
+    <div class="prog" id="pg" style="margin-top:14px"><i></i></div>
+    <div id="pg-status" class="mut" style="font-size:12.5px;margin-top:8px;display:none;align-items:center;gap:8px">
+      <span class="spin" style="display:inline-block;width:13px;height:13px;border-width:1.5px"></span>
+      <span id="pg-text">Connecting to GitHub REST API...</span>
+    </div>
   </div>
-  <div class="row" style="margin-top:6px">
-    <details style="width:100%;background:rgba(8,11,26,.4);border:1px solid rgba(196,181,253,.15);border-radius:10px;margin-bottom:0">
-      <summary style="padding:8px 14px;font-size:12.5px;color:var(--mut)">🔑 Private Repository & Authentication (Optional)</summary>
-      <div style="padding:10px 14px">
-        <p class="mut" style="font-size:12px;margin:0 0 8px">To analyze private repositories or bypass public API rate-limits, enter a GitHub Personal Access Token (PAT). Tokens are processed securely in-memory and never logged or exposed.</p>
-        <input type="password" id="gh-token" placeholder="ghp_... or github_pat_..." style="font-size:13px;max-width:440px" aria-label="GitHub Token">
-      </div>
-    </details>
-  </div>
-  <div class="prog" id="pg" style="margin-top:14px"><i></i></div>
-  <div id="pg-status" class="mut" style="font-size:12.5px;margin-top:8px;display:none;align-items:center;gap:8px">
-    <span class="spin" style="display:inline-block;width:13px;height:13px;border-width:1.5px"></span>
-    <span id="pg-text">Connecting to GitHub REST API...</span>
+  <div id="github-results" class="mt">
+    <div class="card" style="text-align:center;padding:42px 20px;border:1px dashed var(--line);background:rgba(16,22,43,.45)">
+      <div style="font-size:36px;margin-bottom:12px">🪐</div>
+      <h3 style="color:var(--tx);font-size:18px">GitHub Repository Review Ready</h3>
+      <p class="mut" style="max-width:560px;margin:8px auto 0;font-size:14px;line-height:1.5">Enter a public or private GitHub repository URL above (or click <b>"⚡ Sample Repo"</b>) and click <b>"Analyze Repository"</b> to inspect metadata, directory tree, static vulnerabilities, and AI architecture review.</p>
+    </div>
   </div>
 </div>
-<div id="github-results" class="mt">
-  <div class="card" style="text-align:center;padding:42px 20px;border:1px dashed var(--line);background:rgba(16,22,43,.45)">
-    <div style="font-size:36px;margin-bottom:12px">🪐</div>
-    <h3 style="color:var(--tx);font-size:18px">GitHub Repository Review Ready</h3>
-    <p class="mut" style="max-width:560px;margin:8px auto 0;font-size:14px;line-height:1.5">Enter a public or private GitHub repository URL above (or click <b>"⚡ Sample Repo"</b>) and click <b>"Analyze Repository"</b> to inspect metadata, directory tree, static vulnerabilities, and AI architecture review.</p>
+
+<!-- SECTION 2: PUSH & COMMIT ANALYSIS -->
+<div id="gh-section-push" style="display:none">
+  <div class="card">
+    <div class="row" style="margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <input type="text" id="push-url" placeholder="https://github.com/owner/repository" style="flex:2;min-width:240px" aria-label="Repository URL" value="https://github.com/Srish-pathak/Technical-Specification-Analyser">
+      <input type="text" id="push-branch" placeholder="Branch (e.g. main)" style="flex:1;min-width:100px;max-width:140px" aria-label="Branch" value="main">
+      <input type="text" id="push-commit" placeholder="Commit SHA (defaults to latest)" style="flex:1.2;min-width:150px" aria-label="Commit SHA">
+      <button type="button" class="btn ghost" id="push-fetch-btn" onclick="fetchRecentCommitsUI()" style="padding:10px 14px;animation:none">🔄 Fetch Commits</button>
+      <button type="button" class="btn ghost" id="push-simulate-btn" onclick="simulatePushAnalysis()" style="padding:10px 14px;animation:none">🧪 Test Push</button>
+      <button class="btn" id="push-analyze-btn" onclick="triggerPushAnalysis()"><span class="spin"></span>Analyze Push</button>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <details style="width:100%;background:rgba(8,11,26,.4);border:1px solid rgba(196,181,253,.15);border-radius:10px;margin-bottom:0">
+        <summary style="padding:8px 14px;font-size:12.5px;color:var(--mut)">🔑 GitHub Personal Access Token (Optional)</summary>
+        <div style="padding:10px 14px">
+          <p class="mut" style="font-size:12px;margin:0 0 8px">To analyze private repositories or bypass rate limits, enter a GitHub Personal Access Token (PAT).</p>
+          <input type="password" id="push-token" placeholder="ghp_... or github_pat_..." style="font-size:13px;max-width:440px" aria-label="GitHub Token">
+        </div>
+      </details>
+    </div>
+    <div class="prog" id="push-pg" style="margin-top:14px;display:none"><i></i></div>
+    <div id="push-pg-status" class="mut" style="font-size:12.5px;margin-top:8px;display:none;align-items:center;gap:8px">
+      <span class="spin" style="display:inline-block;width:13px;height:13px;border-width:1.5px"></span>
+      <span id="push-pg-text">Inspecting push commit diff...</span>
+    </div>
+  </div>
+
+  <!-- Recent Commits Feed -->
+  <div id="push-commits-feed" class="mt" style="display:none"></div>
+
+  <!-- Push Analysis Results Box -->
+  <div id="push-results" class="mt">
+    <div class="card" style="text-align:center;padding:42px 20px;border:1px dashed var(--line);background:rgba(16,22,43,.45)">
+      <div style="font-size:36px;margin-bottom:12px">🚀</div>
+      <h3 style="color:var(--tx);font-size:18px">GitHub Push & Commit Analysis Ready</h3>
+      <p class="mut" style="max-width:560px;margin:8px auto 0;font-size:14px;line-height:1.5">Analyze any git push or commit to detect newly introduced security flaws, regressions, and cyclomatic complexity changes directly on modified lines. Click <b>"🔄 Fetch Commits"</b> or <b>"Analyze Push"</b> to begin.</p>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 3: WEBHOOK & CI/CD SETUP -->
+<div id="gh-section-webhook" style="display:none">
+  <div class="card">
+    <div class="row sp" style="align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <div class="row" style="gap:10px">
+        <div style="font-size:26px">⚡</div>
+        <div>
+          <h3 style="font-size:17px;margin:0;color:var(--tx)">Automated Git Push Webhook Integration</h3>
+          <p class="mut" style="font-size:13px;margin:4px 0 0">Configure your GitHub repository to trigger automatic code quality and security analysis on every <code>git push</code>.</p>
+        </div>
+      </div>
+      <button type="button" class="btn ghost" onclick="testWebhookPing()" style="padding:8px 16px;animation:none">🧪 Test Webhook Ping</button>
+    </div>
+
+    <!-- Webhook URL Box -->
+    <div style="background:rgba(8,11,26,.8);border:1px solid rgba(196,181,253,.25);border-radius:10px;padding:14px 16px;margin-bottom:18px">
+      <small class="mut" style="font-weight:600;display:block;margin-bottom:6px">Payload URL (Enter this in GitHub):</small>
+      <div class="row" style="gap:8px">
+        <input type="text" id="webhook-url-input" readonly value="${window.location.origin}/api/analysis/github/webhook" style="font-family:monospace;font-size:13px;flex:1;background:rgba(0,0,0,.5);color:#93c5fd" aria-label="Webhook URL">
+        <button type="button" class="btn ghost" onclick="copyWebhookUrl(this)" style="padding:8px 16px;animation:none">📋 Copy URL</button>
+      </div>
+    </div>
+
+    <!-- Step by Step Setup Guide -->
+    <h4 style="font-size:14px;color:var(--tx);margin:16px 0 10px">Step-by-Step GitHub Setup Instructions:</h4>
+    <div class="grid g2" style="gap:12px">
+      <div style="background:rgba(8,11,26,.5);border:1px solid var(--line);border-radius:10px;padding:14px">
+        <b style="color:var(--l);font-size:13.5px">1. Open GitHub Settings</b>
+        <p class="mut" style="font-size:12.5px;margin:6px 0 0">Navigate to your repository on GitHub -> <b>Settings</b> tab in top navigation -> click <b>Webhooks</b> in the left sidebar.</p>
+      </div>
+      <div style="background:rgba(8,11,26,.5);border:1px solid var(--line);border-radius:10px;padding:14px">
+        <b style="color:var(--l);font-size:13.5px">2. Add Webhook</b>
+        <p class="mut" style="font-size:12.5px;margin:6px 0 0">Click <b>Add webhook</b>. Paste the Payload URL above, choose <b>application/json</b> for Content type.</p>
+      </div>
+      <div style="background:rgba(8,11,26,.5);border:1px solid var(--line);border-radius:10px;padding:14px">
+        <b style="color:var(--l);font-size:13.5px">3. Select Events</b>
+        <p class="mut" style="font-size:12.5px;margin:6px 0 0">Under "Which events would you like to trigger this webhook?", select <b>Just the push event</b>.</p>
+      </div>
+      <div style="background:rgba(8,11,26,.5);border:1px solid var(--line);border-radius:10px;padding:14px">
+        <b style="color:var(--l);font-size:13.5px">4. Automated Gatekeeping</b>
+        <p class="mut" style="font-size:12.5px;margin:6px 0 0">Click <b>Add webhook</b>. Every developer push will now automatically be analyzed, scored, and recorded in your Analysis History!</p>
+      </div>
+    </div>
   </div>
 </div>`,
 
@@ -1421,6 +1517,447 @@ function renderGithubOutput(data, scrollIntoView = true) {
   }
 }
 
+let LAST_PUSH_DATA = null;
+
+function switchGithubTab(tab) {
+  const tabs = ['repo', 'push', 'webhook'];
+  tabs.forEach(t => {
+    const btn = $(`#gh-tab-${t}`);
+    const sec = $(`#gh-section-${t}`);
+    if (btn) {
+      if (t === tab) {
+        btn.classList.add('tab-active');
+        btn.classList.remove('ghost');
+      } else {
+        btn.classList.remove('tab-active');
+        btn.classList.add('ghost');
+      }
+    }
+    if (sec) {
+      sec.style.display = (t === tab) ? 'block' : 'none';
+    }
+  });
+}
+
+function copyWebhookUrl(btn) {
+  const inp = $('#webhook-url-input');
+  if (!inp) return;
+  navigator.clipboard.writeText(inp.value).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = orig, 2200);
+    toast('Webhook URL copied to clipboard!');
+  }).catch(() => {
+    inp.select();
+    document.execCommand('copy');
+    toast('Webhook URL copied!');
+  });
+}
+
+async function testWebhookPing() {
+  toast('Sending ping to webhook endpoint...');
+  try {
+    const res = await fetch('/api/analysis/github/webhook', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-GitHub-Event': 'ping'
+      },
+      body: JSON.stringify({ zen: 'Keep it logically awesome.', hook_id: 123456 })
+    });
+    const data = await res.json();
+    if (data.status === 'pong') {
+      toast('✅ Webhook Active! Server response: ' + data.message);
+    } else {
+      toast('Webhook response: ' + JSON.stringify(data));
+    }
+  } catch(e) {
+    toast('Webhook ping failed: ' + e.message);
+  }
+}
+
+async function fetchRecentCommitsUI() {
+  const url = ($('#push-url') ? $('#push-url').value : '').trim();
+  const branch = ($('#push-branch') ? $('#push-branch').value : '').trim();
+  const token = ($('#push-token') ? $('#push-token').value : '').trim();
+  if(!url) return toast('Please enter a GitHub repository URL.');
+
+  const feed = $('#push-commits-feed');
+  if(feed) {
+    feed.style.display = 'block';
+    feed.innerHTML = `
+      <div class="card" style="padding:20px;text-align:center">
+        <span class="spin" style="display:inline-block;width:18px;height:18px;border-width:2px"></span>
+        <span style="margin-left:8px;color:var(--tx)">Connecting to GitHub API & retrieving commit log...</span>
+      </div>
+    `;
+  }
+
+  try {
+    const res = await fetch('/api/analysis/github/commits', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ url, branch: branch || null, token: token || null, limit: 6 })
+    });
+    if(!res.ok) {
+      const err = await res.json().catch(()=>({detail:'HTTP error '+res.status}));
+      throw new Error((err.error && err.error.message) ? err.error.message : (err.detail || 'Failed to fetch commits'));
+    }
+    const data = await res.json();
+    renderCommitsFeed(data.commits || [], url, branch, token);
+  } catch(e) {
+    if(feed) feed.innerHTML = `<div class="card" style="padding:16px;color:var(--red)">Failed to fetch commits: ${escapeHtml(e.message)}</div>`;
+    toast('Error: ' + e.message);
+  }
+}
+
+function renderCommitsFeed(commits, url, branch, token) {
+  const feed = $('#push-commits-feed');
+  if (!feed) return;
+  if (!commits || !commits.length) {
+    feed.innerHTML = `<div class="card" style="padding:16px;text-align:center;color:var(--mut)">No commits found for ${escapeHtml(url)}.</div>`;
+    return;
+  }
+
+  feed.innerHTML = `
+    <div class="card" style="margin-bottom:18px;background:rgba(8,11,26,.7);border:1px solid rgba(196,181,253,.2)">
+      <div class="row sp" style="margin-bottom:12px;border-bottom:1px solid var(--line);padding-bottom:8px">
+        <b style="color:var(--tx);font-size:14px">Recent Pushes / Commits (${commits.length})</b>
+        <small class="mut">Click "Analyze Push 🚀" to run diff quality & security audit</small>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${commits.map(c => `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:rgba(16,22,43,.6);border:1px solid var(--line);border-radius:8px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:10px;min-width:260px;flex:1">
+              ${c.author_avatar ? `<img src="${escapeHtml(c.author_avatar)}" width="24" height="24" style="border-radius:50%" alt="Avatar">` : `<span style="font-size:18px">👤</span>`}
+              <div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span class="chip c-b" style="font-family:monospace;font-size:11px;padding:2px 6px">${escapeHtml(c.short_sha)}</span>
+                  <b style="color:var(--tx);font-size:13px">${escapeHtml(c.message)}</b>
+                </div>
+                <div class="mut" style="font-size:11.5px;margin-top:2px">
+                  ${escapeHtml(c.author_name)} · 📅 ${c.date ? new Date(c.date).toLocaleString() : 'Recent'}
+                </div>
+              </div>
+            </div>
+            <div class="row" style="gap:6px">
+              <a href="${escapeHtml(c.html_url)}" target="_blank" rel="noopener" class="btn ghost" style="padding:4px 10px;font-size:11.5px;animation:none">GitHub ↗</a>
+              <button type="button" class="btn" onclick="selectAndAnalyzeCommit('${escapeHtml(c.sha)}')" style="padding:6px 14px;font-size:12px;animation:none">Analyze Push 🚀</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function selectAndAnalyzeCommit(sha) {
+  const commitInp = $('#push-commit');
+  if(commitInp) commitInp.value = sha;
+  triggerPushAnalysis(sha);
+}
+
+async function triggerPushAnalysis(forcedSha = null) {
+  const url = ($('#push-url') ? $('#push-url').value : '').trim();
+  const branch = ($('#push-branch') ? $('#push-branch').value : '').trim();
+  const commitSha = forcedSha || ($('#push-commit') ? $('#push-commit').value : '').trim();
+  const token = ($('#push-token') ? $('#push-token').value : '').trim();
+
+  if(!url) return toast('Please enter a GitHub repository URL.');
+
+  const btn = $('#push-analyze-btn');
+  if(btn && btn.classList.contains('busy')) return;
+  if(btn) btn.classList.add('busy');
+
+  const p = $('#push-pg');
+  const pStatus = $('#push-pg-status');
+  const pText = $('#push-pg-text');
+  if(p) p.style.display = 'block';
+  if(pStatus) pStatus.style.display = 'flex';
+
+  const updateProgress = (pct, text) => {
+    if(p && p.firstElementChild) p.firstElementChild.style.width = pct + '%';
+    if(pText) pText.textContent = text;
+  };
+
+  updateProgress(15, 'Validating URL & Authenticating...');
+  const t1 = setTimeout(() => updateProgress(35, 'Fetching commit details, author & diff patch...'), 800);
+  const t2 = setTimeout(() => updateProgress(65, 'Downloading repository state at commit ref...'), 2000);
+  const t3 = setTimeout(() => updateProgress(85, 'Executing static vulnerability and complexity analysis...'), 4000);
+  const t4 = setTimeout(() => updateProgress(95, 'Synthesizing AI push impact & quality scoring...'), 6000);
+
+  try {
+    const res = await fetch('/api/analysis/github/push', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        url: url,
+        branch: branch || null,
+        commit_sha: commitSha || null,
+        token: token || null
+      })
+    });
+
+    clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
+
+    if(!res.ok) {
+      const errData = await res.json().catch(()=>({detail:'HTTP error '+res.status}));
+      const msg = (errData.error && errData.error.message) ? errData.error.message : (errData.detail || 'Push analysis failed');
+      throw new Error(msg);
+    }
+
+    updateProgress(100, 'Push analysis complete!');
+    const data = await res.json();
+    setTimeout(() => {
+      if(p) p.style.display = 'none';
+      if(pStatus) pStatus.style.display = 'none';
+    }, 400);
+
+    if(btn) btn.classList.remove('busy');
+    renderPushOutput(data);
+    toast('🚀 Git Push analysis completed!');
+  } catch(err) {
+    clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4);
+    if(btn) btn.classList.remove('busy');
+    if(p) p.style.display = 'none';
+    if(pStatus) pStatus.style.display = 'none';
+    toast('Push Error: ' + err.message);
+  }
+}
+
+function simulatePushAnalysis() {
+  const commitInp = $('#push-commit');
+  if(commitInp) commitInp.value = '1b907c2';
+  toast('Simulating Push Event for commit 1b907c2...');
+  triggerPushAnalysis('1b907c2');
+}
+
+function renderPushOutput(data, scrollIntoView = true) {
+  LAST_PUSH_DATA = data;
+  const el = $('#push-results');
+  if(!el) return;
+
+  const push = data.push_event || {};
+  const repo = data.repository || {};
+  const metrics = data.metrics || {};
+  const pushFindings = data.push_findings || [];
+  const allFindings = data.findings || [];
+  const ai = data.ai || {};
+  const stats = push.stats || {};
+  const changedFiles = push.changed_files || [];
+
+  const pushScore = metrics.push_quality_score ?? 100;
+  const repoScore = metrics.repository_health_score ?? 85;
+  const pushStatus = metrics.push_status || 'PASSED';
+
+  let statusBadgeHtml = '<span class="chip c-g" style="font-size:13px;padding:4px 12px">✅ PASSED · READY TO MERGE</span>';
+  let scoreColor = 'var(--grn)';
+
+  if (pushStatus === 'BLOCKED') {
+    statusBadgeHtml = '<span class="chip c-r" style="font-size:13px;padding:4px 12px">🚨 BLOCKED · CRITICAL ISSUES DETECTED</span>';
+    scoreColor = 'var(--red)';
+  } else if (pushStatus === 'REQUIRES_ATTENTION') {
+    statusBadgeHtml = '<span class="chip c-a" style="font-size:13px;padding:4px 12px">⚠️ REQUIRES ATTENTION · WARNINGS DETECTED</span>';
+    scoreColor = 'var(--amb)';
+  }
+
+  // Changed files breakdown
+  const filesListHtml = changedFiles.map(f => {
+    let statusPill = '<span class="chip c-b" style="font-size:10.5px">MODIFIED</span>';
+    if (f.status === 'added') statusPill = '<span class="chip c-g" style="font-size:10.5px">ADDED</span>';
+    else if (f.status === 'removed') statusPill = '<span class="chip c-r" style="font-size:10.5px">REMOVED</span>';
+    else if (f.status === 'renamed') statusPill = '<span class="chip c-a" style="font-size:10.5px">RENAMED</span>';
+
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(8,11,26,.6);border:1px solid var(--line);border-radius:8px;margin-bottom:6px;font-size:12.5px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;font-family:monospace;color:var(--tx)">
+          ${statusPill}
+          <span>${escapeHtml(f.filename)}</span>
+        </div>
+        <div class="row" style="gap:10px;font-family:monospace;font-size:11.5px">
+          ${f.additions ? `<span style="color:var(--grn)">+${f.additions}</span>` : ''}
+          ${f.deletions ? `<span style="color:var(--red)">-${f.deletions}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('') || '<div class="mut" style="font-size:12.5px">No individual file diff details recorded for this commit.</div>';
+
+  // Push findings
+  const pushFindingsHtml = pushFindings.length ? pushFindings.map((f, i) => `
+    <div style="background:rgba(16,22,43,.7);border:1px solid rgba(196,181,253,.2);border-radius:10px;padding:14px;margin-bottom:10px">
+      <div class="row sp" style="align-items:flex-start;margin-bottom:6px">
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <span class="chip ${f.severity === 'Critical' || f.severity === 'High' ? 'c-r' : 'c-a'}">${escapeHtml(f.severity)}</span>
+          <span class="chip" style="background:rgba(139,92,246,.2);color:#c4b5fd;font-family:monospace">${escapeHtml(f.rule_id)}</span>
+          <span class="chip" style="background:rgba(239,68,68,.15);color:#fca5a5">🚀 Introduced in this Push</span>
+        </div>
+        <span class="mut" style="font-size:12px;font-family:monospace">${escapeHtml(f.file_path || f.file || '')}${f.line_number ? ':' + f.line_number : ''}</span>
+      </div>
+      <p style="color:var(--tx);font-size:13.5px;font-weight:600;margin:6px 0">${escapeHtml(f.description)}</p>
+      ${f.evidence ? `<pre style="background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.08);padding:8px 12px;border-radius:6px;font-size:12px;color:#fca5a5;overflow:auto;margin:6px 0"><code>${escapeHtml(f.evidence)}</code></pre>` : ''}
+      ${f.recommended_correction ? `<div style="font-size:12.5px;color:var(--grn);margin-top:6px">💡 <b>Recommended Fix:</b> ${escapeHtml(f.recommended_correction)}</div>` : ''}
+    </div>
+  `).join('') : `
+    <div style="background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:18px 20px;text-align:center">
+      <div style="font-size:26px;margin-bottom:6px">🎉</div>
+      <b style="color:var(--grn);font-size:15px">Clean Push Verified!</b>
+      <p class="mut" style="font-size:13px;margin:4px 0 0">No critical vulnerabilities, syntax defects, or code smells were introduced in the files modified by this push.</p>
+    </div>
+  `;
+
+  // AI Review Suggestions
+  const suggestions = ai.suggestions || [];
+  const aiSuggestionsHtml = suggestions.length ? suggestions.map(s => `
+    <div style="background:rgba(8,11,26,.65);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px">
+      <div class="row sp" style="margin-bottom:4px">
+        <b style="color:var(--tx);font-size:13.5px">${escapeHtml(s.title || 'Suggestion')}</b>
+        <span class="chip c-b" style="font-size:10.5px">${escapeHtml(s.priority || 'Medium')}</span>
+      </div>
+      <p class="mut" style="font-size:12.5px;margin:4px 0">${escapeHtml(s.description || '')}</p>
+      ${s.affected_file ? `<div class="mut" style="font-size:11.5px">📁 File: <code>${escapeHtml(s.affected_file)}</code></div>` : ''}
+      ${s.suggested_fix ? `<div style="font-size:12px;color:#93c5fd;margin-top:4px">🛠️ Fix: ${escapeHtml(s.suggested_fix)}</div>` : ''}
+    </div>
+  `).join('') : '';
+
+  el.innerHTML = `
+    <!-- Main Push Banner -->
+    <div class="card mt" style="background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(59,130,246,.15));border:1px solid rgba(196,181,253,.35);margin-bottom:18px">
+      <div class="row sp" style="align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+        <div class="row" style="gap:12px">
+          ${push.author_avatar ? `<img src="${escapeHtml(push.author_avatar)}" width="36" height="36" style="border-radius:50%;box-shadow:0 0 10px rgba(139,92,246,.8)" alt="Avatar">` : `<span style="font-size:32px">🚀</span>`}
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <h2 style="font-size:20px;margin:0">${escapeHtml(repo.full_name || data.input_name)}</h2>
+              <span class="chip c-b" style="font-family:monospace;font-size:12px">Commit: ${escapeHtml(push.short_sha || 'latest')}</span>
+              <span class="chip c-g" style="font-size:11px">Branch: ${escapeHtml(data.branch || 'main')}</span>
+            </div>
+            <div style="font-size:14px;color:var(--tx);font-weight:600;margin-top:4px">"${escapeHtml(push.message || 'No commit message')}"</div>
+            <div class="mut" style="font-size:12px;margin-top:2px">
+              Committer: <b>${escapeHtml(push.author_name || 'Unknown')}</b> (${escapeHtml(push.author_login ? '@' + push.author_login : '')}) · 📅 ${push.date ? new Date(push.date).toLocaleString() : 'Recent'}
+            </div>
+          </div>
+        </div>
+        <div class="row" style="gap:8px">
+          ${push.html_url ? `<a href="${escapeHtml(push.html_url)}" target="_blank" rel="noopener" class="btn ghost" style="padding:8px 14px;font-size:12px;animation:none">GitHub Commit ↗</a>` : ''}
+          ${push.compare_url ? `<a href="${escapeHtml(push.compare_url)}" target="_blank" rel="noopener" class="btn ghost" style="padding:8px 14px;font-size:12px;animation:none">Compare Diff ↗</a>` : ''}
+          <button type="button" class="btn ghost" onclick="downloadPushJsonReport()" style="padding:8px 14px;font-size:12px;animation:none">📥 JSON Report</button>
+        </div>
+      </div>
+
+      <!-- Quality Gate Status & Scores -->
+      <div class="row sp" style="align-items:center;background:rgba(8,11,26,.7);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+        <div>
+          <small class="mut" style="display:block;margin-bottom:4px">CI/CD Gatekeeper Status</small>
+          ${statusBadgeHtml}
+        </div>
+        <div class="row" style="gap:24px;flex-wrap:wrap">
+          <div>
+            <small class="mut">Push Quality Score</small>
+            <div style="font-size:24px;font-weight:700;color:${scoreColor}">${pushScore}<span style="font-size:14px;color:var(--mut)">/100</span></div>
+          </div>
+          <div>
+            <small class="mut">Repository Health</small>
+            <div style="font-size:24px;font-weight:700;color:var(--tx)">${repoScore}<span style="font-size:14px;color:var(--mut)">/100</span></div>
+          </div>
+          <div>
+            <small class="mut">Files Changed</small>
+            <div style="font-size:24px;font-weight:700;color:var(--tx)">${changedFiles.length}</div>
+          </div>
+          <div>
+            <small class="mut">Lines Impact</small>
+            <div style="font-size:20px;font-weight:700;color:var(--grn);margin-top:2px">+${stats.additions ?? 0} <span style="color:var(--red);font-size:16px">-${stats.deletions ?? 0}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:var(--mut);line-height:1.5">
+        ℹ️ <b>Gate Scoring Methodology:</b> ${escapeHtml(metrics.scoring_methodology || 'Computed specifically on changes introduced by this push.')}
+      </div>
+    </div>
+
+    <!-- Push Diff Findings Section -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">1. Push Diff Findings (Issues in Changed Files)</b>
+          <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);color:var(--l)">${pushFindings.length} Issue(s)</span>
+        </div>
+        <span class="chip ${pushFindings.length ? (metrics.push_critical_count ? 'c-r' : 'c-a') : 'c-g'}">${pushFindings.length ? (metrics.push_critical_count ? 'CRITICAL' : 'WARNING') : 'CLEAN'}</span>
+      </summary>
+      <div style="padding:16px 20px 20px">${pushFindingsHtml}</div>
+    </details>
+
+    <!-- Changed Files Diff Breakdown -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">2. Changed Files & Diff Breakdown</b>
+          <span class="chip" style="font-size:12px;background:rgba(196,181,253,.08);color:var(--l)">${changedFiles.length} File(s)</span>
+        </div>
+        <span class="chip c-b">INSPECTED</span>
+      </summary>
+      <div style="padding:16px 20px 20px">
+        ${filesListHtml}
+      </div>
+    </details>
+
+    <!-- AI Commit & Push Intelligence (Gemini) -->
+    <details open style="margin-bottom:14px;border:1px solid rgba(196,181,253,.22);border-radius:12px;overflow:hidden;background:rgba(16,22,43,.75)">
+      <summary style="padding:14px 20px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:rgba(16,22,43,.9)">
+        <div class="row" style="gap:10px">
+          <b style="font-size:15px;color:var(--tx)">3. AI Push & Commit Intelligence</b>
+          <span class="chip c-b" style="font-size:12px">${escapeHtml(ai.model || 'TechSpecAnalyser AI Engine')}</span>
+        </div>
+        <span class="chip c-g">REVIEWED</span>
+      </summary>
+      <div style="padding:16px 20px 20px">
+        <div style="background:rgba(8,11,26,.65);border-radius:10px;border:1px solid var(--line);padding:14px 16px;margin-bottom:14px">
+          <b style="color:var(--l);font-size:13px;display:block;margin-bottom:4px">Push Executive Summary</b>
+          <p style="color:var(--tx);font-size:13.5px;margin:0;line-height:1.6">${escapeHtml(ai.summary || 'Push review completed.')}</p>
+        </div>
+
+        <div class="grid g2" style="gap:12px;margin-bottom:14px">
+          <div style="background:rgba(8,11,26,.65);border-radius:10px;border:1px solid var(--line);padding:14px">
+            <b style="color:var(--l);font-size:13px;display:block;margin-bottom:4px">Risk Assessment & Gate Verdict</b>
+            <p style="color:var(--tx);font-size:13px;margin:0;line-height:1.5">${escapeHtml(ai.risk_assessment || 'Low risk commit.')}</p>
+          </div>
+          <div style="background:rgba(8,11,26,.65);border-radius:10px;border:1px solid var(--line);padding:14px">
+            <b style="color:var(--l);font-size:13px;display:block;margin-bottom:4px">Security & Regression Verdict</b>
+            <p style="color:var(--tx);font-size:13px;margin:0;line-height:1.5">${escapeHtml(ai.security_verdict || 'No security vulnerabilities introduced.')}</p>
+          </div>
+        </div>
+
+        ${aiSuggestionsHtml ? `
+          <div style="margin-top:10px">
+            <b style="color:var(--l);font-size:13px;display:block;margin-bottom:8px">Actionable Suggestions for this Push</b>
+            ${aiSuggestionsHtml}
+          </div>
+        ` : ''}
+      </div>
+    </details>
+  `;
+
+  if (scrollIntoView) {
+    setTimeout(() => el.scrollIntoView({ behavior: 'smooth' }), 100);
+  }
+}
+
+function downloadPushJsonReport() {
+  if (!LAST_PUSH_DATA) return toast('No push analysis data to download.');
+  const jsonStr = JSON.stringify(LAST_PUSH_DATA, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const sha = (LAST_PUSH_DATA.push_event && LAST_PUSH_DATA.push_event.short_sha) ? LAST_PUSH_DATA.push_event.short_sha : 'commit';
+  a.download = `push_analysis_${sha}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('Push JSON audit report downloaded!');
+}
+
 let LAST_PDF_DATA = null;
 let PDF_FILTERS = { sev: 'ALL', cat: 'ALL' };
 
@@ -2077,15 +2614,24 @@ function bind(k){
       const c=$('#history-box');
       if(!c)return;
       if(!items.length){c.innerHTML=empty('No analyses yet. Run one and it will be listed here.');return;}
-      c.innerHTML=items.map(it=>`
+      c.innerHTML=items.map(it=>{
+        const isPush = it.input_type === 'github_push';
+        const typeBadge = isPush
+          ? '<span class="chip" style="background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(59,130,246,.25));border-color:rgba(196,181,253,.4);color:#93c5fd;font-size:11px">🚀 Git Push</span>'
+          : (it.input_type === 'github' ? '<span class="chip c-b" style="font-size:11px">GitHub Repo</span>' : (it.input_type === 'pdf' ? '<span class="chip c-b" style="font-size:11px">PDF Spec</span>' : '<span class="chip c-g" style="font-size:11px">Code Analysis</span>'));
+        return `
         <div style="padding:14px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:rgba(8,11,26,.6)">
           <div class="row sp">
-            <b>${it.input_name} (${it.language})</b>
+            <div style="display:flex;align-items:center;gap:8px">
+              ${typeBadge}
+              <b style="color:var(--tx)">${escapeHtml(it.input_name)} ${it.language ? '('+it.language+')' : ''}</b>
+            </div>
             <span class="chip c-g">${it.status}</span>
           </div>
-          <div class="mut" style="font-size:12px;margin-top:6px">ID: ${it.id} · ${it.created_at} · Issues: ${it.issues_total} (Critical/High: ${it.critical_count + it.high_count})</div>
+          <div class="mut" style="font-size:12px;margin-top:6px">ID: ${it.id} · 📅 ${it.created_at} · Total Issues: ${it.issues_total} (Critical/High: ${it.critical_count + it.high_count})</div>
         </div>
-      `).join('');
+      `;
+      }).join('');
     }).catch(()=>{});
   }
   if(k=='dashboard'){

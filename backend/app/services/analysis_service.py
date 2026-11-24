@@ -32,9 +32,10 @@ def analyze_files(files: list[SourceFile], input_type: str, input_name: str, lan
     limitations: list[str] = []
     file_rows, structures = [], {}
     parsed: list[tuple[SourceFile, ast.Module]] = []
-    analyzable_langs = ANALYZABLE_LANGUAGES if input_type != "github" else frozenset({"python", "javascript", "typescript"})
+    is_git = input_type in ("github", "github_push")
+    analyzable_langs = frozenset({"python", "javascript", "typescript"}) if is_git else ANALYZABLE_LANGUAGES
     python_files = [f for f in files if f.kind == "source" and f.language == "python"]
-    js_files = [f for f in files if f.kind == "source" and f.language in ("javascript", "typescript")] if input_type == "github" else []
+    js_files = [f for f in files if f.kind == "source" and f.language in ("javascript", "typescript")] if is_git else []
     analyzed_js_count = 0
 
     cc_sum = fn_count = max_cc = 0
@@ -56,7 +57,7 @@ def analyze_files(files: list[SourceFile], input_type: str, input_name: str, lan
             else:
                 parsed.append((f, tree))
                 row["analyzed"] = True
-        elif f.language in ("javascript", "typescript") and input_type == "github":
+        elif f.language in ("javascript", "typescript") and is_git:
             js_findings, js_metric = analyze_javascript_file(f.content, f.path)
             findings.extend(js_findings)
             fn_count += js_metric.get("functions", 1)
