@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import analysis, history, system
+from app.api.routes import analysis, history, system, webhooks
 from app.services.file_manager import InputValidationError
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
@@ -37,6 +37,7 @@ async def add_cache_control_headers(request: Request, call_next):
 app.include_router(system.router)
 app.include_router(analysis.router)
 app.include_router(history.router)
+app.include_router(webhooks.router)
 
 if FRONTEND_DIR.is_dir():   # mounted last so /api/* routes win
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

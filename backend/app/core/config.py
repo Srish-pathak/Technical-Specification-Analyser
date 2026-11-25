@@ -46,6 +46,9 @@ class Settings:
     ai_model: str = ""
     ai_api_key: str = field(default="", repr=False)
     ai_timeout_seconds: int = 60
+    github_webhook_secret: str = field(default="", repr=False)
+    github_token: str = field(default="", repr=False)
+    github_api_base_url: str = "https://api.github.com"
 
     @property
     def ai_configured(self) -> bool:
@@ -69,4 +72,7 @@ def get_settings() -> Settings:
         ai_model=os.environ.get("TSA_AI_MODEL", os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")),
         ai_api_key=os.environ.get("TSA_AI_API_KEY", os.environ.get("GEMINI_API_KEY", "")),
         ai_timeout_seconds=_int("TSA_AI_TIMEOUT_SECONDS", d.ai_timeout_seconds),
+        github_webhook_secret=os.environ.get("GITHUB_WEBHOOK_SECRET", os.environ.get("TSA_GITHUB_WEBHOOK_SECRET", "")),
+        github_token=os.environ.get("GITHUB_TOKEN", os.environ.get("TSA_GITHUB_TOKEN", "")),
+        github_api_base_url=os.environ.get("GITHUB_API_BASE_URL", os.environ.get("TSA_GITHUB_API_BASE_URL", d.github_api_base_url)),
     )

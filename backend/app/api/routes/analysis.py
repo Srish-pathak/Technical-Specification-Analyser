@@ -97,12 +97,29 @@ def process_webhook_push(payload: Dict[str, Any], settings=None, db=None) -> Dic
     d.save(result)
 
     commit_sha = result.get("push_event", {}).get("commit_sha", "")
+    repo_obj = payload.get("repository") or {}
+    full_name = (repo_obj.get("full_name") or "").lower()
+    if full_name:
+        push_ev = result.get("push_event", {})
+        metrics = result.get("metrics", {})
+        d.update_repository_push(full_name, {
+            "commit_sha": commit_sha,
+            "commit_message": push_ev.get("message"),
+            "author": push_ev.get("author_name"),
+            "analysis_id": result["analysis_id"],
+            "status": "completed",
+            "quality_score": metrics.get("push_quality_score"),
+            "gate_status": metrics.get("push_status"),
+            "pushed_at": push_ev.get("date") or gh_svc.utcnow(),
+        })
+
     return {
         "status": "completed",
         "event": "push",
         "analysis_id": result["analysis_id"],
         "repository": result["input_name"],
         "commit_sha": commit_sha,
+        "analysis_type": result.get("analysis_type", "Incremental Analysis"),
         "push_status": result["metrics"].get("push_status"),
         "push_quality_score": result["metrics"].get("push_quality_score"),
         "push_critical_count": result["metrics"].get("push_critical_count"),

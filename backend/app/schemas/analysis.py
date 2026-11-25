@@ -30,6 +30,20 @@ class GithubCommitsRequest(BaseModel):
     limit: Optional[int] = Field(10, ge=1, le=30, description="Max commits to return")
 
 
+class GithubRepoConnectRequest(BaseModel):
+    url: str = Field(..., min_length=5, description="GitHub repository URL (e.g. https://github.com/owner/repo)")
+    default_branch: Optional[str] = Field("main", description="Default branch to track")
+    auto_analysis: Optional[bool] = Field(True, description="Whether to automatically run analysis on incoming push events")
+    webhook_secret: Optional[str] = Field(None, description="Optional per-repository webhook secret")
+
+
+class GithubRepoUpdateRequest(BaseModel):
+    default_branch: Optional[str] = Field(None, description="Updated branch")
+    auto_analysis: Optional[bool] = Field(None, description="Enable or disable automatic push analysis")
+    is_active: Optional[bool] = Field(None, description="Connection active flag")
+    webhook_secret: Optional[str] = Field(None, description="Optional updated webhook secret")
+
+
 class ErrorBody(BaseModel):
     code: str
     message: str
