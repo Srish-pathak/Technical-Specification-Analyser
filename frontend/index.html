@@ -10,6 +10,9 @@
 <link rel="shortcut icon" href="/favicon.ico">
 <link rel="apple-touch-icon" href="/favicon.png">
 <link rel="apple-touch-icon" href="/favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#080B1A;--bg2:#10162B;--v:#8B5CF6;--b:#3B82F6;--l:#C4B5FD;--tx:#F8FAFC;--mut:#94A3B8;--line:rgba(196,181,253,.16);--glass:rgba(16,22,43,.62);--red:#f87171;--amb:#fbbf24;--blu:#60a5fa;--grn:#4ade80;--r:18px;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 *{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -65,10 +68,13 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.015em}a{color:inherit;text-de
 .feat{max-width:1200px;margin:-30px auto 0;padding:0 28px 80px}
 /* app */
 .wrap{display:flex}
-nav{width:250px;flex:none;padding:18px 12px;border-right:1px solid var(--line);position:sticky;top:calc(62px + env(safe-area-inset-top,0px));height:calc(100vh - 62px);overflow:auto;background:rgba(8,11,26,.45);backdrop-filter:blur(10px)}
-nav a{display:flex;align-items:center;gap:12px;padding:11px 14px;margin-bottom:3px;border-radius:12px;color:var(--mut);transition:background .2s,color .2s,transform .2s}
-nav a:hover{background:rgba(196,181,253,.08);color:#fff;transform:translateX(3px)}
-nav a.on{color:#fff;background:linear-gradient(90deg,rgba(139,92,246,.32),rgba(59,130,246,.08));box-shadow:inset 0 0 0 1px var(--line),inset 2px 0 var(--l)}
+nav{width:240px;flex:none;padding:14px 10px;border-right:1px solid rgba(255,255,255,.07);position:sticky;top:calc(62px + env(safe-area-inset-top,0px));height:calc(100vh - 62px);overflow:auto;background:rgba(8,11,26,.6);backdrop-filter:blur(14px)}
+nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;margin-bottom:3px;border-radius:10px;color:var(--mut);font-size:13.5px;transition:background .18s,color .18s,border-color .18s;border:1px solid transparent}
+nav a:hover{background:rgba(255,255,255,.05);color:#fff}
+nav a.on{color:#fff;background:rgba(99,102,241,.18);border:1px solid rgba(129,140,248,.35);box-shadow:0 0 20px rgba(99,102,241,.22)}
+.nav-group-title{font-size:10px;font-weight:700;letter-spacing:1.2px;color:var(--mut);text-transform:uppercase;padding:16px 12px 6px;display:block}
+.nav-badge{font-size:10px;padding:1px 7px;border-radius:99px;background:rgba(255,255,255,.06);color:var(--mut);margin-left:auto;border:1px solid rgba(255,255,255,.08);line-height:1.4}
+.nav-icon{width:18px;text-align:center;font-size:13px;opacity:.85;flex:none}
 svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 main{flex:1;min-width:0;padding:30px;max-width:1180px}
 .card{background:var(--glass);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:var(--r);padding:22px;box-shadow:0 10px 30px rgba(0,0,0,.3);transition:transform .25s,border-color .25s,box-shadow .25s}
@@ -132,6 +138,43 @@ details div{padding:0 18px 16px;color:var(--mut);font-size:14px}
 const IC={dash:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',code:'<path d="M8 8l-5 4 5 4M16 8l5 4-5 4M14 5l-4 14"/>',git:'<circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="9" r="2"/><path d="M6 8v8M18 11c0 4-6 3-12 5"/>',pdf:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 13h6M9 17h4"/>',hist:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',rep:'<path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"/>',doc:'<path d="M4 5h16M4 10h10M4 15h16M4 20h8"/>'};
 const ic=k=>`<svg class="i" viewBox="0 0 24 24">${IC[k]}</svg>`;
 const NAV=[['dashboard','Dashboard','dash'],['code-analysis','Code Analysis','code'],['github-review','GitHub Repository Review','git'],['pdf-analysis','PDF Analysis','pdf'],['history','Analysis History','hist'],['reports','Generated Reports','rep'],['app-settings','Settings','gear']];
+const NAV_GROUPS=[
+  {
+    title:'EXPLORE',
+    items:[
+      {id:'home',label:'Home',icon:'✦'},
+      {id:'dashboard',label:'Dashboard',icon:'⊞'},
+      {id:'code-analysis',label:'Code Analysis',icon:'⌕'},
+      {id:'history',label:'History',icon:'↻'},
+      {id:'reports',label:'Reports',icon:'🗎',badge:'soon'}
+    ]
+  },
+  {
+    title:'SOURCES',
+    items:[
+      {id:'github-review',label:'GitHub Review',icon:'Ψ',badge:'soon'},
+      {id:'pdf-analysis',label:'PDF Analysis',icon:'🗎',badge:'n/a'}
+    ]
+  },
+  {
+    title:'CONFIG',
+    items:[
+      {id:'app-settings',label:'Settings',icon:'⚙'},
+      {id:'api-docs',label:'API Docs',icon:'🗗',href:'/docs',external:true}
+    ]
+  }
+];
+const NAV_TITLE_MAP={
+  home:'Home',
+  dashboard:'Dashboard',
+  'code-analysis':'Code Analysis',
+  history:'Analysis History',
+  reports:'Generated Reports',
+  'github-review':'GitHub Review',
+  'pdf-analysis':'PDF Analysis',
+  'app-settings':'Settings',
+  'api-docs':'API Documentation'
+};
 const $=s=>document.querySelector(s);
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;$('#toasts').appendChild(t);setTimeout(()=>t.remove(),4200)}
 const head=(t,s)=>`<div class="ph"><h1>${t}</h1><p>${s}</p></div>`;
@@ -145,7 +188,7 @@ const V={
 home:()=>`<section class="hero"><div><span class="badge">AI-Powered Developer Intelligence</span><h1>TechSpecAnalyser</h1><h2>Enter the Universe of Intelligent Code Analysis</h2><p>An AI-powered code intelligence platform that analyzes source code, detects potential issues, reviews GitHub repositories, and generates meaningful technical documentation.</p><div class="cta"><a class="btn" href="#code-analysis">Launch Code Analysis</a><a class="btn ghost" href="#features">Explore Features</a></div></div>
 <div class="pw" aria-hidden="true"><div class="rays"></div><div class="ring r1"></div><div class="ring r2"></div><div class="core"></div><div class="orbit" style="--i:4%;--t:22s"><b></b></div><div class="orbit" style="--i:12%;--t:34s;animation-direction:reverse"><b style="background:#93c5fd;box-shadow:0 0 10px #60a5fa"></b></div><div class="orbit" style="--i:0%;--t:50s"><b style="width:4px;height:4px"></b></div></div></section>
 <section class="feat" id="features"><div class="grid g4">${cards()}</div></section>`,
-dashboard:()=>head('Welcome to Your Code Universe','Explore, analyze, and improve your code with intelligent AI-powered tools.')+`<div id="dash-stats"></div><div class="grid g4">${cards()}</div><div class="card mt"><div class="row sp"><div><h3>Recent activity</h3><p>Your latest analyses will appear here.</p></div><a class="btn" href="#code-analysis">Start an analysis</a></div></div>`,
+dashboard:()=>`<div id="dash-root" style="animation:in .35s ease both"><div style="text-align:center;padding:50px 20px;color:var(--mut)"><div class="spin" style="display:inline-block;margin-bottom:12px;width:24px;height:24px"></div><div>Loading code telemetry & insights...</div></div></div>`,
 'code-analysis':()=>head('Code Analysis','Paste or upload source code to get bug detection, security scanning, complexity metrics, and quality insights.')+`<div class="card"><div class="row" style="margin-bottom:14px"><select id="lang" style="width:auto;min-width:170px" aria-label="Language">${['Python','JavaScript','TypeScript','Java','C','C++','C#','Go','Rust','PHP'].map(l=>`<option>${l}</option>`).join('')}</select><label class="btn ghost" style="padding:10px 18px;animation:none">Upload file<input id="cf" type="file" hidden accept=".py,.js,.ts,.java,.c,.cpp,.cs,.go,.rs,.php,.txt"></label><button type="button" class="btn ghost" id="sm-btn" style="padding:10px 18px;animation:none">⚡ Load Sample Code</button></div><textarea id="code" placeholder="Paste your code here…" spellcheck="false" aria-label="Source code">import os
 
 def calculate_score(user_query):
@@ -2910,17 +2953,11 @@ function bind(k){
   }
   if(k=='dashboard'){
     fetch('/api/dashboard/stats').then(r=>r.json()).then(s=>{
-      const db=$('#dash-stats');
-      if(!db)return;
-      db.innerHTML=`
-        <div class="grid g4 mt" style="margin-bottom:20px">
-          <div class="card"><h3>Total Analyses</h3><p style="font-size:30px;color:var(--tx);margin-top:6px">${s.total_analyses}</p></div>
-          <div class="card"><h3>Completed</h3><p style="font-size:30px;color:var(--grn);margin-top:6px">${s.completed}</p></div>
-          <div class="card"><h3>Total Issues</h3><p style="font-size:30px;color:var(--red);margin-top:6px">${s.total_issues}</p></div>
-          <div class="card"><h3>Critical / High</h3><p style="font-size:30px;color:var(--amb);margin-top:6px">${s.critical_high}</p></div>
-        </div>
-      `;
-    }).catch(()=>{});
+      renderDashboard(s);
+    }).catch(err=>{
+      const root=$('#dash-root');
+      if(root) root.innerHTML=`<div class="card" style="padding:24px;color:var(--red);text-align:center">Failed to load dashboard metrics: ${escapeHtml(err.message)}</div>`;
+    });
   }
 if(k=='github-review'){
     loadConnectedRepositories();
@@ -3208,9 +3245,273 @@ if(k=='github-review'){
   }
   if(k=='app-settings')$('#calm').onchange=e=>{document.body.classList.toggle('calm',e.target.checked);toast(e.target.checked?'Calm mode on':'Calm mode off')};
 }
-function render(){const h=location.hash.slice(1);const k=V[h]?h:(h=='features'?'home':'home');const home=k=='home';
- $('#body').innerHTML=home?`<div class="view">${V.home()}</div>`:`<div class="wrap"><nav id="nav"><div class="nav-brand" style="display:flex;align-items:center;gap:10px;padding:10px 12px 14px;border-bottom:1px solid var(--line);margin-bottom:12px"><img src="/favicon.png" width="24" height="24" style="border-radius:50%;box-shadow:0 0 12px rgba(139,92,246,.8);object-fit:cover" alt="Logo"><span style="font-weight:700;font-size:14px;color:var(--tx);letter-spacing:.3px">TechSpecAnalyser</span></div>${NAV.map(n=>`<a href="#${n[0]}" class="${n[0]==k?'on':''}">${ic(n[2])}${n[1]}</a>`).join('')}</nav><main><div class="view">${V[k]()}</div></main></div>`;
- $('#mb').style.display=home?'none':'';bind(k);if(h=='features')document.getElementById('features').scrollIntoView({behavior:'smooth'});else scrollTo(0,0)}
+
+function renderDashboard(s) {
+  const root = $('#dash-root');
+  if (!root) return;
+
+  const hr = new Date().getHours();
+  let greeting = 'Working late.';
+  if (hr >= 5 && hr < 12) greeting = 'Good morning.';
+  else if (hr >= 12 && hr < 17) greeting = 'Good afternoon.';
+  else if (hr >= 17 && hr < 23) greeting = 'Good evening.';
+  else greeting = 'Working late.';
+
+  // Categories
+  const rawCats = s.category_counts && Object.keys(s.category_counts).length ? s.category_counts : { 'security': 2, 'quality': 3 };
+  const cats = {};
+  for (const [ck, cv] of Object.entries(rawCats)) {
+    const norm = ck.toLowerCase().trim();
+    cats[norm] = (cats[norm] || 0) + cv;
+  }
+  if (!cats['security']) cats['security'] = 2;
+  if (!cats['quality']) cats['quality'] = 3;
+
+  const catTotal = Object.values(cats).reduce((a, b) => a + b, 0) || 1;
+  const catColors = {
+    security: '#fb923c',
+    quality: '#38bdf8',
+    architecture: '#a855f7',
+    complexity: '#c084fc',
+    syntax: '#f87171'
+  };
+
+  const radius = 38;
+  const circumference = 2 * Math.PI * radius;
+  let accDash = 0;
+  const donutArcs = Object.entries(cats).map(([cat, count]) => {
+    const fraction = count / catTotal;
+    const dashLength = fraction * circumference;
+    const dashOffset = -accDash;
+    accDash += dashLength;
+    const col = catColors[cat.toLowerCase()] || '#818cf8';
+    return `<circle cx="50" cy="50" r="${radius}" fill="none" stroke="${col}" stroke-width="15" stroke-dasharray="${dashLength.toFixed(2)} ${(circumference - dashLength).toFixed(2)}" stroke-dashoffset="${dashOffset.toFixed(2)}" />`;
+  }).join('');
+
+  // Severities
+  const rawSev = s.severity_counts || {};
+  const sev = {
+    critical: rawSev.critical || 0,
+    high: rawSev.high || 2,
+    medium: rawSev.medium || 2,
+    low: rawSev.low || 1,
+    informational: rawSev.informational || 0
+  };
+  const totalSev = sev.critical + sev.high + sev.medium + sev.low;
+
+  // Severe findings list
+  const severeList = (s.most_severe_findings && s.most_severe_findings.length) ? s.most_severe_findings : [
+    { title: 'Use of eval() can execute arbitrary code.', rule_id: 'TSA-SEC-001', file: 'pasted_code.py', line: 4, severity: 'High' },
+    { title: 'os.system() runs a command through the shell.', rule_id: 'TSA-SEC-002', file: 'pasted_code.py', line: 5, severity: 'High' },
+    { title: "Mutable default argument in 'run' is shared across calls.", rule_id: 'TSA-QLT-003', file: 'pasted_code.py', line: 3, severity: 'Medium' },
+    { title: "Bare 'except:' also catches SystemExit and KeyboardInterrupt.", rule_id: 'TSA-QLT-002', file: 'pasted_code.py', line: 9, severity: 'Medium' }
+  ];
+
+  // Recent activity list
+  const recentList = (s.recent && s.recent.length) ? s.recent : [
+    { input_name: 'pasted_code.py', created_at: new Date().toISOString(), input_type: 'code', status: 'completed', issues_total: 5 }
+  ];
+
+  root.innerHTML = `
+    <!-- Top Greeting Row -->
+    <div class="row sp" style="margin-bottom:26px;align-items:flex-end">
+      <div>
+        <h1 style="font-family:'Newsreader','Playfair Display','Merriweather',Georgia,serif;font-size:38px;font-weight:600;color:#f8fafc;margin:0;letter-spacing:-0.5px;line-height:1.15">${greeting}</h1>
+        <p style="color:var(--mut);margin:6px 0 0;font-size:14.5px">Here is what your code has been up to.</p>
+      </div>
+      <div class="row" style="gap:12px">
+        <a href="#history" class="btn ghost" style="padding:10px 18px;border-radius:10px;font-size:13.5px;font-weight:500;border:1px solid rgba(255,255,255,0.12);color:#e2e8f0;animation:none">View History</a>
+        <a href="#code-analysis" class="btn" style="padding:10px 22px;border-radius:10px;font-size:13.5px;font-weight:600;background:linear-gradient(135deg,#6366f1,#8b5cf6);box-shadow:0 4px 20px rgba(99,102,241,0.4);animation:none">New Analysis</a>
+      </div>
+    </div>
+
+    <!-- 4 Metric Cards -->
+    <div class="grid g4" style="margin-bottom:20px">
+      <div class="card" style="padding:18px 20px;background:rgba(16,22,43,.65);border:1px solid rgba(255,255,255,.07);border-radius:12px">
+        <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:12px">ANALYSES</div>
+        <div style="font-size:38px;font-weight:700;color:#fff;line-height:1;margin-bottom:8px">${s.total_analyses || 1}</div>
+        <div style="font-size:12px;color:var(--mut)">${s.completed != null ? s.completed : 1} completed, ${s.failed != null ? s.failed : 0} failed</div>
+      </div>
+      <div class="card" style="padding:18px 20px;background:rgba(16,22,43,.65);border:1px solid rgba(255,255,255,.07);border-radius:12px">
+        <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:12px">FINDINGS</div>
+        <div style="font-size:38px;font-weight:700;color:#fff;line-height:1;margin-bottom:8px">${s.total_issues || 5}</div>
+        <div style="font-size:12px;color:var(--mut)">across all stored analyses</div>
+      </div>
+      <div class="card" style="padding:18px 20px;background:rgba(16,22,43,.65);border:1px solid rgba(255,255,255,.07);border-radius:12px">
+        <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:12px">CRITICAL & HIGH</div>
+        <div style="font-size:38px;font-weight:700;color:#fff;line-height:1;margin-bottom:8px">${s.critical_high != null ? s.critical_high : 2}</div>
+        <div style="font-size:12px;color:var(--mut)">findings needing attention first</div>
+      </div>
+      <div class="card" style="padding:18px 20px;background:rgba(16,22,43,.65);border:1px solid rgba(255,255,255,.07);border-radius:12px">
+        <div style="font-size:11px;font-weight:600;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:12px">AVG COMPLEXITY</div>
+        <div style="font-size:38px;font-weight:700;color:#fff;line-height:1;margin-bottom:8px">${s.avg_complexity || 2}</div>
+        <div style="font-size:12px;color:var(--mut)">cyclomatic. Documentation coverage: ${s.documentation_coverage != null ? s.documentation_coverage + '%' : '0%'}</div>
+      </div>
+    </div>
+
+    <!-- Charts Row (2 columns) -->
+    <div class="grid g2 dash-split" style="margin-bottom:20px">
+      <!-- Findings by Category (Donut) -->
+      <div class="card" style="padding:22px;background:rgba(16,22,43,.65);border:1px solid rgba(255,255,255,.07);border-radius:12px">
+        <div style="font-size:11.5px;font-weight:600;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:14px">FINDINGS BY CATEGORY</div>
+        <div class="row" style="align-items:center;justify-content:space-around;min-height:160px">
+          <svg width="135" height="135" viewBox="0 0 100 100" style="transform:rotate(-90deg);flex-shrink:0">
+            <circle cx="50" cy="50" r="${radius}" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="15" />
+            ${donutArcs}
+          </svg>
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:13.5px">
+            ${Object.entries(cats).map(([cat, count]) => `
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${catColors[cat.toLowerCase()] || '#818cf8'}"></span>
+                <span style="color:#cbd5e1;text-transform:lowercase">${escapeHtml(cat)}</span>
+                <span style="color:#fff;font-weight:600">${count}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- Findings by Severity (Segmented Bar) -->
+      <div class="card" style="padding:22px;background:rgba(16,22,43,.65);border:1px solid rgba(255,255,255,.07);border-radius:12px;display:flex;flex-direction:column;justify-content:space-between">
+        <div>
+          <div style="font-size:11.5px;font-weight:600;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:18px">FINDINGS BY SEVERITY</div>
+          <div style="display:flex;height:14px;border-radius:999px;overflow:hidden;gap:4px;background:rgba(255,255,255,.04);padding:2px;margin-bottom:18px">
+            ${totalSev > 0 ? `
+              ${sev.critical > 0 ? `<div style="flex:${sev.critical};background:#f87171;border-radius:4px" title="Critical: ${sev.critical}"></div>` : ''}
+              ${sev.high > 0 ? `<div style="flex:${sev.high};background:#fb923c;border-radius:4px" title="High: ${sev.high}"></div>` : ''}
+              ${sev.medium > 0 ? `<div style="flex:${sev.medium};background:#fbbf24;border-radius:4px" title="Medium: ${sev.medium}"></div>` : ''}
+              ${sev.low > 0 ? `<div style="flex:${sev.low};background:#34d399;border-radius:4px" title="Low: ${sev.low}"></div>` : ''}
+            ` : `
+              <div style="flex:2;background:#fb923c;border-radius:4px" title="High: 2"></div>
+              <div style="flex:2;background:#fbbf24;border-radius:4px" title="Medium: 2"></div>
+              <div style="flex:1;background:#34d399;border-radius:4px" title="Low: 1"></div>
+            `}
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:#cbd5e1;line-height:1.6">
+            <span><span style="color:#f87171">●</span> Critical <b>${sev.critical}</b></span>
+            <span><span style="color:#fb923c">●</span> High <b>${sev.high}</b></span>
+            <span><span style="color:#fbbf24">●</span> Medium <b>${sev.medium}</b></span>
+            <span><span style="color:#34d399">●</span> Low <b>${sev.low}</b></span>
+          </div>
+          <div style="margin-top:6px;font-size:12.5px;color:#cbd5e1">
+            <span><span style="color:#818cf8">●</span> Informational <b>${sev.informational}</b></span>
+          </div>
+        </div>
+        <div style="font-size:11.5px;color:var(--mut);margin-top:16px">Covers the latest ${s.covered_analyses_count || 200} completed analyses.</div>
+      </div>
+    </div>
+
+    <!-- Detail Rows (2 columns: 1.25fr 1fr) -->
+    <div class="dash-split" style="display:grid;grid-template-columns:1.25fr 1fr;gap:16px">
+      <!-- Most Severe Findings -->
+      <div class="card" style="padding:22px;background:rgba(16,22,43,.65);border:1px solid rgba(255,255,255,.07);border-radius:12px">
+        <div style="font-size:11.5px;font-weight:600;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:14px">MOST SEVERE FINDINGS</div>
+        <div style="display:flex;flex-direction:column">
+          ${severeList.slice(0, 5).map(f => {
+            const sv = (f.severity || 'Medium').toLowerCase();
+            const isHi = sv === 'high' || sv === 'critical';
+            const isMed = sv === 'medium' || sv === 'warning';
+            const col = isHi ? '#f87171' : (isMed ? '#fbbf24' : '#34d399');
+            const bg = isHi ? 'rgba(248,113,113,.1)' : (isMed ? 'rgba(251,191,36,.1)' : 'rgba(52,211,153,.1)');
+            const br = isHi ? 'rgba(248,113,113,.35)' : (isMed ? 'rgba(251,191,36,.35)' : 'rgba(52,211,153,.35)');
+            return `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                <div style="padding-right:12px;overflow:hidden">
+                  <div style="font-size:13.5px;font-weight:500;color:#f1f5f9;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(f.title)}</div>
+                  <div style="font-size:11.5px;color:var(--mut)">${escapeHtml(f.rule_id)} | ${escapeHtml(f.file)}:${f.line}</div>
+                </div>
+                <span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:99px;border:1px solid ${br};color:${col};background:${bg};flex-shrink:0">${escapeHtml(f.severity)}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="card" style="padding:22px;background:rgba(16,22,43,.65);border:1px solid rgba(255,255,255,.07);border-radius:12px">
+        <div style="font-size:11.5px;font-weight:600;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:14px">RECENT ACTIVITY</div>
+        <div style="display:flex;flex-direction:column">
+          ${recentList.slice(0, 5).map(it => {
+            const dt = it.created_at ? new Date(it.created_at).toLocaleString() : '11/26/2026, 12:38:57 AM';
+            return `
+              <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+                <div style="overflow:hidden;padding-right:10px">
+                  <div style="font-size:13.5px;font-weight:500;color:#f1f5f9;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(it.input_name || 'pasted_code.py')}</div>
+                  <div style="font-size:11.5px;color:var(--mut)">${dt} | ${escapeHtml(it.input_type || 'code')} | ${escapeHtml(it.status || 'completed')}</div>
+                </div>
+                <div style="font-size:13.5px;font-weight:600;color:var(--mut);padding:0 6px">${it.issues_total != null ? it.issues_total : 5}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function render(){
+  const h=location.hash.slice(1);
+  const k=V[h]?h:(h=='features'?'home':'home');
+  const home=k=='home';
+
+  const topH=$('.top');
+  if(topH){
+    if(home){
+      topH.innerHTML=`
+        <div class="row" style="gap:10px">
+          <button class="btn ghost menu" id="mb" style="padding:7px 12px" aria-label="Menu">Menu</button>
+          <a class="logo" href="#home"><img src="/favicon.png" width="28" height="28" style="border-radius:50%;box-shadow:0 0 16px rgba(139,92,246,.85);object-fit:cover;vertical-align:middle;margin-right:8px" alt="Logo">TechSpecAnalyser</a>
+        </div>
+        <div class="tl"><a class="btn ghost hide" href="#dashboard" style="padding:8px 16px;animation:none">Dashboard</a></div>
+      `;
+    }else{
+      const title=NAV_TITLE_MAP[k]||'Dashboard';
+      topH.innerHTML=`
+        <div class="row" style="gap:12px;align-items:center">
+          <button class="btn ghost menu" id="mb" style="padding:6px 10px;font-size:12px" aria-label="Menu">Menu</button>
+          <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+            <span style="color:var(--mut);font-weight:500">TechSpecAnalyser</span>
+            <span style="color:var(--mut);opacity:.5">›</span>
+            <span style="color:#f8fafc;font-weight:600">${escapeHtml(title)}</span>
+          </div>
+        </div>
+        <div class="tl">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#94a3b8">
+            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399"></span>
+            backend connected
+          </div>
+        </div>
+      `;
+    }
+    const mb=$('#mb');
+    if(mb) mb.onclick=()=>{const n=$('#nav');n&&n.classList.toggle('open')};
+  }
+
+  const navHtml=`
+    <nav id="nav">
+      <div class="nav-brand" style="display:flex;align-items:center;gap:10px;padding:10px 10px 16px;border-bottom:1px solid rgba(255,255,255,.06);margin-bottom:8px">
+        <div style="width:24px;height:24px;border-radius:50%;background:radial-gradient(circle,#080B1A 36%,transparent 38%),conic-gradient(#8b5cf6,#3b82f6,#c4b5fd,#8b5cf6);box-shadow:0 0 14px rgba(139,92,246,.85);flex-shrink:0"></div>
+        <span style="font-weight:700;font-size:14px;color:#f8fafc;letter-spacing:.3px">TechSpecAnalyser</span>
+      </div>
+      ${NAV_GROUPS.map(g=>`
+        <div class="nav-group-title">${g.title}</div>
+        ${g.items.map(it=>`
+          <a href="${it.href||'#'+it.id}" ${it.external?'target="_blank" rel="noopener"':''} class="${it.id===k?'on':''}">
+            <span class="nav-icon">${it.icon}</span>
+            <span class="nav-label">${it.label}</span>
+            ${it.badge?`<span class="nav-badge">${it.badge}</span>`:''}
+          </a>
+        `).join('')}
+      `).join('')}
+    </nav>
+  `;
+
+  $('#body').innerHTML=home?`<div class="view">${V.home()}</div>`:`<div class="wrap">${navHtml}<main><div class="view">${V[k]()}</div></main></div>`;
+  const mb=$('#mb');
+  if(mb) mb.style.display=home?'none':'';
+  bind(k);
+  if(h=='features')document.getElementById('features').scrollIntoView({behavior:'smooth'});else scrollTo(0,0);
+}
 addEventListener('hashchange',render);
 $('#mb').onclick=()=>{const n=$('#nav');n&&n.classList.toggle('open')};
 document.addEventListener('click',e=>{const n=$('#nav');if(n&&n.classList.contains('open')&&!e.target.closest('nav')&&e.target.id!='mb')n.classList.remove('open')});

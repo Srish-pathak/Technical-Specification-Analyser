@@ -114,12 +114,61 @@ class Database:
                              COALESCE(SUM(function_count),0) fn, COALESCE(SUM(complexity_sum),0) cx,
                              COALESCE(SUM(doc_items),0) di, COALESCE(SUM(doc_documented),0) dd FROM analyses""").fetchone()
             recent = c.execute(f"SELECT {_LIST_COLS} FROM analyses ORDER BY created_at DESC, rowid DESC LIMIT 5").fetchall()
+
+            detail_rows = c.execute("SELECT result_json FROM analyses WHERE status='completed' AND result_json IS NOT NULL ORDER BY created_at DESC, rowid DESC LIMIT 200").fetchall()
+
+            severities = {"critical": 0, "high": 0, "medium": 0, "low": 0, "informational": 0}
+            categories: dict[str, int] = {}
+            all_findings: list[dict[str, Any]] = []
+
+            for row in detail_rows:
+                raw_json = row["result_json"]
+                if not raw_json:
+                    continue
+                try:
+                    payload = json.loads(raw_json)
+                    findings = payload.get("findings", [])
+                    for f in findings:
+                        sev_str = str(f.get("severity") or "Informational").strip().lower()
+                        if sev_str in ("critical", "crit"):
+                            severities["critical"] += 1
+                        elif sev_str in ("high", "hi"):
+                            severities["high"] += 1
+                        elif sev_str in ("medium", "med", "warning", "warn"):
+                            severities["medium"] += 1
+                        elif sev_str in ("low",):
+                            severities["low"] += 1
+                        else:
+                            severities["informational"] += 1
+
+                        cat_str = str(f.get("category") or "quality").strip().lower()
+                        categories[cat_str] = categories.get(cat_str, 0) + 1
+
+                        if sev_str not in ("passed", "ok"):
+                            all_findings.append({
+                                "title": f.get("description") or f.get("title") or "Identified issue",
+                                "rule_id": f.get("rule_id") or f.get("rule") or "TSA-GEN",
+                                "file": f.get("file_path") or f.get("file") or "source.py",
+                                "line": f.get("line_number") or f.get("line") or 1,
+                                "severity": f.get("severity") or "Medium",
+                            })
+                except Exception:
+                    continue
+
+            sev_rank = {"critical": 4, "high": 3, "medium": 2, "warning": 2, "low": 1, "informational": 0}
+            all_findings.sort(key=lambda x: sev_rank.get(str(x["severity"]).lower(), 0), reverse=True)
+            most_severe = all_findings[:8]
+
         return {
             "total_analyses": t["n"], "completed": t["done"] or 0, "failed": t["failed"] or 0,
             "total_issues": t["issues"], "critical_high": t["crit_high"],
             "avg_complexity": round(t["cx"] / t["fn"], 2) if t["fn"] else None,
             "documentation_coverage": round(100 * t["dd"] / t["di"], 1) if t["di"] else None,
             "recent": [dict(r) for r in recent], "empty": t["n"] == 0,
+            "severity_counts": severities,
+            "category_counts": categories,
+            "most_severe_findings": most_severe,
+            "covered_analyses_count": len(detail_rows),
         }
 
     def purge_older_than(self, days: int) -> int:
