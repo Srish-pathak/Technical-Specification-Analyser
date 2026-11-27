@@ -66,18 +66,3 @@ produce false positives (confidence is recorded). See `docs/phase_reports.md`.
 The GitHub reference repositories could not be accessed during development (no network in the build sandbox), so
 **no code or design was taken from them**; everything here is original.
 
----
-
-## 🚀 Deployment to Render
-
-This repository is configured for one-click deployment on [Render](https://render.com):
-
-1. **Create Web Service**:
-   - Go to [dashboard.render.com](https://dashboard.render.com/) > **New +** > **Web Service**.
-   - Connect this GitHub repository: `https://github.com/Srish-pathak/Technical-Specification-Analyser`.
-   - Render automatically detects `Dockerfile` and `render.yaml`.
-2. **Environment Variables**:
-   - Optional: set `TSA_AI_PROVIDER` (e.g., `gemini`) and `TSA_AI_API_KEY` for AI features when available.
-3. **Deploy**:
-   - Click **Create Web Service**. Render builds the Python container, verifies the `/health` endpoint, and provides your live URL.
-
